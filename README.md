@@ -1,29 +1,36 @@
-# AS Gamebook Reader — Stormcage Companion
+# Stormcage — Interactive Read-Along Companion
 
-An unofficial, fan-made interactive companion for **Doctor Who: Stormcage – A River Song Adventure**, built for the read-along on the TARDIS Guide forum.
+A fan-made, browser-based companion for the gamebook **Doctor Who: Stormcage – A River Song Adventure** (BBC Books, 2026), built for the TARDIS Guide forum read-along.
 
-> **Full spoiler warning.** This tool exposes the entire branching structure of the adventure — chapter order, choices and outcomes. Everything in it spoils the plot. Read the book first if you want to stay clean.
+> **Full spoilers.** This companion lays out the book's entire branching structure: every section, choice and ending is visible by design. If you want an unspoiled run, don't open it before reading.
 
-## What this is
+## What it is
 
-A minimal, playable **synopsis edition** of the gamebook:
+A playable **synopsis edition** plus a progress tracker for the choose-your-own-adventure structure. Every section is presented as a short English summary instead of the book's prose, and you make the choices yourself. **No text from the published novel is included** — to read the actual story you need your own copy.
 
-- Navigate the adventure chapter by chapter and make the CYOA choices yourself.
-- Your reading progress is saved automatically in your browser — close the page and pick up where you left off.
-- All prose is replaced by short English synopses. **The book's original text is not included here**, so you will still need your own copy of the gamebook for the actual reading.
+Open the page in any modern browser, desktop or mobile. Nothing to install and no account required. Everything runs locally in a single self-contained HTML file.
 
-## What's coming
+## Features
 
-This is deliberately a first, stripped-down release. The full AS Gamebook Reader app is in development and will add:
+- **Play the branching story** — move from section to section through the book's own choices, with **Undo** and **Restart from 001**.
+- **Automatic save** — your progress is stored in your own browser (one save slot). Close the tab and pick up later with **Continue**.
+- **Completion tracking** — a live percentage of sections read and a counter of different endings you have reached.
+- **Your Story Tree** — a zoomable map of *your* exploration: sections reached, your current position, unexplored frontiers, and paths that loop back to earlier sections. The book's special mechanics (dice rolls, coin flips, date branches, code choices) get distinct edge styles, and endings are colour-coded (good / neutral / bad / death).
+- **Bring-your-own original text** — the companion ships in **Summary** mode. If you have the book and a compatible text pack of your own, you can import it in **Settings** to unlock an **Original** mode and toggle between summary and prose at any point.
+- **Save export / import** — download your progress as a JSON file and load it on another device or browser.
+- **Reading preferences** — adjustable font size and a customisable top bar.
 
-- A dedicated reader entry point and a library of supported gamebooks.
-- A story branch map showing which paths you have already explored.
-- A "bring your own text pack" option so you can read the full prose alongside the tracker.
+## How your progress is stored
 
-## How to use
+All progress lives only in the browser's local storage on the device you play on. It is never uploaded anywhere, and no one else can see it. Note that:
 
-Open the hosted page (GitHub Pages) in any modern browser, desktop or mobile. No account, no install. The page is a single self-contained file — you can also download `index.html` and open it locally. To start over, use **Settings → Clear all progress** in the app.
+- progress does **not** sync between devices or browsers on its own (use Export / Import save to move it);
+- clearing browser data removes it, and private/incognito windows start fresh every time.
+
+## What's planned
+
+This is the first release, with one book. More gamebook companions in the same synopsis-edition format may be added later, along with a dedicated multi-book reader app.
 
 ## Disclaimer
 
-This is a fan project made for discussion and read-along tracking. It is not affiliated with, or endorsed by, the BBC, the author, or the publisher. No text from the original novel is reproduced; the synopses are original summaries written for this tool.
+Unofficial fan project for discussion and read-along tracking. Not affiliated with or endorsed by the BBC, the authors or the publisher. No copyrighted text from the novel is redistributed here; all summaries are original writing created for this tool.
