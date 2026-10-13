@@ -2923,6 +2923,13 @@ var ASStoryTreeRender = (function () {
         '<div class="chapter-prompt">' + esc(sec.p) + "</div>");
     }
 
+    // Return to the top of the article on every chapter switch. The
+    // scroll container is .chapter-body (overflow-y: auto), not the
+    // window, so window.scrollTo() does not reset the reading position.
+    var bodyEl = document.querySelector(".chapter-body");
+    if (bodyEl) bodyEl.scrollTop = 0;
+    window.scrollTo(0, 0);
+
     // reading-mode segmented control (Summary | Original)
     updateModeControl();
 
