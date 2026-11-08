@@ -1,0 +1,221 @@
+/* Reading-page shell shared by every book. The per-book page supplies
+   --bg / --surface / --text / --muted / --accent / --accent2 and the two
+   font tokens inline, so only the palette and motif change between books. */
+
+:root {
+  --bg: #060a10;
+  --surface: #0d141c;
+  --text: #eef2f6;
+  --muted: #9aa8b6;
+  --accent: #4ea8de;
+  --accent2: #e8c870;
+  --font-display: Georgia, "Times New Roman", serif;
+  --font-body: "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { color-scheme: dark; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1000px 560px at 18% -12%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 58%),
+    radial-gradient(800px 420px at 92% 6%, color-mix(in srgb, var(--accent2) 10%, transparent), transparent 55%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.back {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  padding: 8px 13px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .5);
+  backdrop-filter: blur(8px);
+  color: var(--accent2);
+  text-decoration: none;
+  font-size: .8rem;
+  letter-spacing: .04em;
+  transition: border-color .15s ease, color .15s ease;
+}
+
+.back:hover,
+.back:focus-visible {
+  border-color: var(--accent2);
+  color: #fff;
+  outline: none;
+}
+
+.sheet {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: clamp(86px, 10vw, 112px) clamp(18px, 4vw, 30px) 64px;
+}
+
+.kicker {
+  margin: 0;
+  font-size: .66rem;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 {
+  margin: .18em 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5.4vw, 3.1rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: .01em;
+  color: #fbf8f0;
+}
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.status {
+  display: inline-block;
+  padding: 4px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent2);
+  font-size: .64rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-planned {
+  border-color: rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .03);
+  color: var(--muted);
+}
+
+.status-note {
+  font-size: .8rem;
+  color: var(--muted);
+}
+
+.note {
+  max-width: 62ch;
+  margin: 26px 0 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 12px 12px 0;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  font-size: .94rem;
+  color: var(--muted);
+}
+
+.panel {
+  margin-top: 22px;
+  padding: 20px 22px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, .008));
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: .06em;
+  color: var(--accent2);
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px 20px;
+  margin: 0;
+}
+
+.detail dt {
+  font-size: .62rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.detail dd {
+  margin: 3px 0 0;
+  font-size: .95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.theme-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 34%) 1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.theme-art {
+  display: block;
+  min-height: 128px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.theme-copy p { margin: 0 0 6px; font-size: .9rem; color: var(--muted); }
+.theme-copy p strong { color: var(--text); font-weight: 600; }
+
+.swatches {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 50%;
+}
+
+.foot {
+  margin: 30px 0 0;
+  font-size: .82rem;
+}
+
+.foot a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, .18);
+}
+
+.foot a:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+:focus-visible {
+  outline: 2px solid var(--accent2);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .theme-row { grid-template-columns: 1fr; }
+  .theme-art { min-height: 96px; }
+  .sheet { padding-top: 76px; }
+  .back { top: 10px; left: 10px; }
+}

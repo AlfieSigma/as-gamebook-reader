@@ -1,0 +1,208 @@
+/* Decorative motif patterns for the public gamebook shelf and reading pages.
+   Each element reads --accent and --accent2 from its inline theme tokens.
+   Patterns are decoration only; no text or cover art is published. */
+
+.p-orbit,
+.p-rings,
+.p-facets,
+.p-scales,
+.p-columns,
+.p-circuit,
+.p-eclipse,
+.p-stripes,
+.p-dots,
+.p-layers,
+.p-waves,
+.p-rays,
+.p-rain,
+.p-gingham,
+.p-chalk,
+.p-bars {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--surface, #0d141c);
+}
+
+.p-orbit::before,
+.p-rings::before,
+.p-facets::before,
+.p-scales::before,
+.p-columns::before,
+.p-circuit::before,
+.p-eclipse::before,
+.p-stripes::before,
+.p-dots::before,
+.p-layers::before,
+.p-waves::before,
+.p-rays::before,
+.p-rain::before,
+.p-gingham::before,
+.p-chalk::before,
+.p-bars::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.p-orbit::after,
+.p-rings::after,
+.p-facets::after,
+.p-scales::after,
+.p-columns::after,
+.p-circuit::after,
+.p-eclipse::after,
+.p-stripes::after,
+.p-dots::after,
+.p-layers::after,
+.p-waves::after,
+.p-rays::after,
+.p-rain::after,
+.p-gingham::after,
+.p-chalk::after,
+.p-bars::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .05), transparent 45%, rgba(0, 0, 0, .3));
+}
+
+/* drifting hulls and orbits */
+.p-orbit::before {
+  background:
+    radial-gradient(circle at 76% 24%, color-mix(in srgb, var(--accent2) 26%, transparent), transparent 52%),
+    repeating-radial-gradient(circle at 22% 62%, transparent 0 8px,
+      color-mix(in srgb, var(--accent) 34%, transparent) 8px 9px, transparent 9px 18px);
+}
+
+/* arena tiers seen from above */
+.p-rings::before {
+  background:
+    radial-gradient(circle at 82% 52%, color-mix(in srgb, var(--accent2) 28%, transparent), transparent 58%),
+    repeating-radial-gradient(circle at 82% 52%, transparent 0 12px,
+      color-mix(in srgb, var(--accent) 40%, transparent) 12px 13px, transparent 13px 25px);
+}
+
+/* crystal and ice shards */
+.p-facets::before {
+  background: conic-gradient(from 205deg at 32% 28%,
+    transparent 0 18deg,
+    color-mix(in srgb, var(--accent) 30%, transparent) 18deg 30deg,
+    transparent 30deg 72deg,
+    color-mix(in srgb, var(--accent2) 22%, transparent) 72deg 84deg,
+    transparent 84deg 152deg,
+    color-mix(in srgb, var(--accent) 18%, transparent) 152deg 166deg,
+    transparent 166deg 360deg);
+}
+
+/* overlapping scales */
+.p-scales::before {
+  background:
+    radial-gradient(circle at 12px 18px, transparent 0 10px,
+      color-mix(in srgb, var(--accent) 32%, transparent) 10px 11px, transparent 11px 20px),
+    radial-gradient(circle at 36px 30px, transparent 0 10px,
+      color-mix(in srgb, var(--accent2) 22%, transparent) 10px 11px, transparent 11px 20px);
+  background-size: 48px 36px;
+  background-repeat: repeat;
+}
+
+/* classical columns */
+.p-columns::before {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 18px,
+      color-mix(in srgb, var(--accent) 30%, transparent) 18px 20px, transparent 20px 46px),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent2) 16%, transparent), transparent 70%);
+}
+
+/* circuit board plating */
+.p-circuit::before {
+  background:
+    radial-gradient(circle at 15px 15px,
+      color-mix(in srgb, var(--accent2) 45%, transparent) 0 2px, transparent 2.5px),
+    repeating-linear-gradient(0deg, transparent 0 15px,
+      color-mix(in srgb, var(--accent) 22%, transparent) 15px 16px),
+    repeating-linear-gradient(90deg, transparent 0 15px,
+      color-mix(in srgb, var(--accent) 22%, transparent) 15px 16px);
+  background-size: 30px 30px, auto, auto;
+}
+
+/* eclipsed planet */
+.p-eclipse::before {
+  background:
+    radial-gradient(circle at 62% 46%, var(--surface) 0 27%, transparent 28%),
+    radial-gradient(circle at 65% 43%, color-mix(in srgb, var(--accent2) 52%, transparent) 0 31%, transparent 44%),
+    radial-gradient(circle at 28% 64%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 56%);
+}
+
+/* prairie, trail and rain bands */
+.p-stripes::before {
+  background: repeating-linear-gradient(115deg, transparent 0 14px,
+    color-mix(in srgb, var(--accent) 26%, transparent) 14px 20px, transparent 20px 38px);
+}
+
+/* luggage tags and dot matrices */
+.p-dots::before {
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--accent) 42%, transparent) 0 2px, transparent 2.5px),
+    radial-gradient(circle, color-mix(in srgb, var(--accent2) 20%, transparent) 0 1px, transparent 1.5px);
+  background-size: 18px 18px, 36px 36px;
+  background-position: 0 0, 9px 9px;
+}
+
+/* stacked skins */
+.p-layers::before {
+  background:
+    repeating-linear-gradient(180deg, transparent 0 12px,
+      color-mix(in srgb, var(--accent) 24%, transparent) 12px 13px, transparent 13px 19px),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent2) 26%, transparent), transparent 65%);
+}
+
+/* fog banks and surf */
+.p-waves::before {
+  background:
+    radial-gradient(circle at 50% 100%, transparent 0 24px,
+      color-mix(in srgb, var(--accent) 26%, transparent) 24px 25px, transparent 25px 48px),
+    radial-gradient(circle at 88% 20%, color-mix(in srgb, var(--accent2) 22%, transparent), transparent 50%);
+  background-size: 64px 40px, auto;
+  background-repeat: repeat, no-repeat;
+}
+
+/* imperial rays and claw light */
+.p-rays::before {
+  background:
+    conic-gradient(from 0deg at 18% 82%,
+      transparent 0 10deg,
+      color-mix(in srgb, var(--accent) 26%, transparent) 10deg 14deg,
+      transparent 14deg 28deg),
+    radial-gradient(circle at 18% 82%, color-mix(in srgb, var(--accent2) 30%, transparent), transparent 56%);
+}
+
+/* monsoon rain */
+.p-rain::before {
+  background: repeating-linear-gradient(80deg, transparent 0 9px,
+    color-mix(in srgb, var(--accent) 24%, transparent) 9px 10px, transparent 10px 20px);
+}
+
+/* Eleventh Doctor bow-tie check */
+.p-gingham::before {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 14px,
+      color-mix(in srgb, var(--accent) 18%, transparent) 14px 18px),
+    repeating-linear-gradient(90deg, transparent 0 14px,
+      color-mix(in srgb, var(--accent2) 16%, transparent) 14px 18px);
+}
+
+/* Twelfth Doctor blackboard */
+.p-chalk::before {
+  background:
+    radial-gradient(ellipse at 22% 28%, color-mix(in srgb, var(--accent2) 14%, transparent), transparent 55%),
+    repeating-linear-gradient(0deg, transparent 0 2px, rgba(255, 255, 255, .04) 2px 3px),
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(255, 255, 255, .03) 22px 23px);
+}
+
+/* Stormcage prison bars */
+.p-bars::before {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 22px,
+      color-mix(in srgb, var(--accent) 35%, transparent) 22px 26px, transparent 26px 48px),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent2) 18%, transparent), transparent 75%);
+}

@@ -1,0 +1,285 @@
+{
+  "version": 1,
+  "notes": "Era base colour plus one accent pair and one motif per book. The reader layout is shared; only tokens and decorative motifs change.",
+  "cover": {
+    "aspect": "2 / 3",
+    "thumbnail_width": 480,
+    "placeholder": {
+      "label": "Cover pending",
+      "show_series": true,
+      "show_index": true
+    }
+  },
+  "defaults": {
+    "palette": {
+      "bg": "#060a10",
+      "surface": "#0d141c",
+      "text": "#eef2f6",
+      "muted": "#9aa8b6",
+      "accent": "#4ea8de",
+      "accent2": "#e8c870"
+    },
+    "fonts": {
+      "display": "Georgia, 'Times New Roman', serif",
+      "body": "'Segoe UI', system-ui, sans-serif"
+    }
+  },
+  "eras": {
+    "river": {
+      "label": "River Song",
+      "tagline": "Gold on TARDIS blue.",
+      "palette": {
+        "bg": "#071423",
+        "surface": "#0d2136",
+        "text": "#eef4f9",
+        "muted": "#98b0c4",
+        "accent": "#c9a24a",
+        "accent2": "#7fb6d9"
+      },
+      "fonts": {
+        "display": "Georgia, 'Times New Roman', serif",
+        "body": "'Segoe UI', system-ui, sans-serif"
+      }
+    },
+    "10th": {
+      "label": "The Tenth Doctor",
+      "tagline": "TARDIS blue and cold cyan.",
+      "palette": {
+        "bg": "#071726",
+        "surface": "#0c2438",
+        "text": "#e8f1f8",
+        "muted": "#93aec6",
+        "accent": "#4ea8de",
+        "accent2": "#f2b134"
+      },
+      "fonts": {
+        "display": "Georgia, 'Times New Roman', serif",
+        "body": "'Segoe UI', system-ui, sans-serif"
+      }
+    },
+    "11th": {
+      "label": "The Eleventh Doctor",
+      "tagline": "Warm cream, sky blue, and a bow-tie check.",
+      "palette": {
+        "bg": "#12100c",
+        "surface": "#211d15",
+        "text": "#f4ecdc",
+        "muted": "#b7a888",
+        "accent": "#87c7ea",
+        "accent2": "#e8d5a3"
+      },
+      "fonts": {
+        "display": "'Palatino Linotype', Georgia, serif",
+        "body": "'Segoe UI', system-ui, sans-serif"
+      }
+    },
+    "12th": {
+      "label": "The Twelfth Doctor",
+      "tagline": "Blackboard ink with a sonic-orange edge.",
+      "palette": {
+        "bg": "#0b0f12",
+        "surface": "#151c21",
+        "text": "#e9edf0",
+        "muted": "#9aa6ad",
+        "accent": "#f08a2e",
+        "accent2": "#4fb6c9"
+      },
+      "fonts": {
+        "display": "Georgia, 'Times New Roman', serif",
+        "body": "'Segoe UI', system-ui, sans-serif"
+      }
+    }
+  },
+  "books": {
+    "stormcage": {
+      "era": "river",
+      "palette": {
+        "accent": "#c9a24a",
+        "accent2": "#7fb6d9"
+      },
+      "motif": "stormcage-bars",
+      "pattern": "bars",
+      "notes": "Prison-cell gold and TARDIS blue; the reader keeps its existing gold-on-blue identity."
+    },
+    "dyd-01-spaceship-graveyard": {
+      "era": "10th",
+      "palette": {
+        "accent": "#5b8fb9",
+        "accent2": "#c7d3dd"
+      },
+      "motif": "starship-graveyard",
+      "pattern": "orbit",
+      "notes": "Derelict hulls drifting in cold light: steel blue and bone white."
+    },
+    "dyd-02-alien-arena": {
+      "era": "10th",
+      "palette": {
+        "accent": "#c0562f",
+        "accent2": "#e8b34a"
+      },
+      "motif": "alien-arena",
+      "pattern": "rings",
+      "notes": "Sand, rust and arena tiers under a hot sun."
+    },
+    "dyd-03-time-crocodile": {
+      "era": "10th",
+      "palette": {
+        "accent": "#4f8a5b",
+        "accent2": "#d8c46a"
+      },
+      "motif": "time-crocodile",
+      "pattern": "scales",
+      "notes": "Jungle green scales with a fossil-yellow glint."
+    },
+    "dyd-04-corinthian-project": {
+      "era": "10th",
+      "palette": {
+        "accent": "#8f9bb3",
+        "accent2": "#3f6d8c"
+      },
+      "motif": "corinthian-project",
+      "pattern": "columns",
+      "notes": "Marble grey columns and deep architectural blue."
+    },
+    "dyd-05-crystal-snare": {
+      "era": "10th",
+      "palette": {
+        "accent": "#6fd3c7",
+        "accent2": "#b98ad6"
+      },
+      "motif": "crystal-snare",
+      "pattern": "facets",
+      "notes": "Crystal cyan and a violet refracted edge."
+    },
+    "dyd-06-war-of-the-robots": {
+      "era": "10th",
+      "palette": {
+        "accent": "#b8c4cf",
+        "accent2": "#e05a3a"
+      },
+      "motif": "war-of-the-robots",
+      "pattern": "circuit",
+      "notes": "Alloy grey plating crossed by warning red."
+    },
+    "dyd-07-dark-planet": {
+      "era": "10th",
+      "palette": {
+        "accent": "#35506e",
+        "accent2": "#8a7bd8"
+      },
+      "motif": "dark-planet",
+      "pattern": "eclipse",
+      "notes": "Night blue under a violet eclipse rim."
+    },
+    "dyd-08-haunted-wagon-train": {
+      "era": "10th",
+      "palette": {
+        "accent": "#a87a4a",
+        "accent2": "#6b7f8f"
+      },
+      "motif": "haunted-wagon-train",
+      "pattern": "stripes",
+      "notes": "Trail dust brown against a grey prairie sky."
+    },
+    "dyd-09-lost-luggage": {
+      "era": "10th",
+      "palette": {
+        "accent": "#c9a24a",
+        "accent2": "#4c8a86"
+      },
+      "motif": "lost-luggage",
+      "pattern": "dots",
+      "notes": "Luggage-tag gold and a teal carousel."
+    },
+    "dyd-10-second-skin": {
+      "era": "10th",
+      "palette": {
+        "accent": "#8f6bb0",
+        "accent2": "#d98f6a"
+      },
+      "motif": "second-skin",
+      "pattern": "layers",
+      "notes": "Violet as the outer skin, warm orange beneath."
+    },
+    "dyd-11-dragon-king": {
+      "era": "10th",
+      "palette": {
+        "accent": "#c2452f",
+        "accent2": "#e8b34a"
+      },
+      "motif": "dragon-king",
+      "pattern": "scales",
+      "notes": "Dragon red scales edged in crown gold."
+    },
+    "dyd-12-horror-of-howling-hill": {
+      "era": "10th",
+      "palette": {
+        "accent": "#5c6b7a",
+        "accent2": "#9ad0a5"
+      },
+      "motif": "howling-hill",
+      "pattern": "waves",
+      "notes": "Fog grey slopes under a pale moon-green haze."
+    },
+    "dyd-13-coldest-war": {
+      "era": "11th",
+      "palette": {
+        "accent": "#7fb6d9",
+        "accent2": "#e6f2fa"
+      },
+      "motif": "coldest-war",
+      "pattern": "facets",
+      "notes": "Ice blue fractures and near-white frost."
+    },
+    "dyd-14-claws-of-the-macra": {
+      "era": "11th",
+      "palette": {
+        "accent": "#b06a3a",
+        "accent2": "#7fa89a"
+      },
+      "motif": "claws-of-the-macra",
+      "pattern": "rings",
+      "notes": "Crustacean rust and an ammonia-green sheen."
+    },
+    "dyd-15-judoon-monsoon": {
+      "era": "11th",
+      "palette": {
+        "accent": "#c0c8d0",
+        "accent2": "#4c9ad6"
+      },
+      "motif": "judoon-monsoon",
+      "pattern": "rain",
+      "notes": "Judoon grey armour in a blue monsoon downpour."
+    },
+    "dyd-16-empire-of-the-wolf": {
+      "era": "11th",
+      "palette": {
+        "accent": "#8c6a3f",
+        "accent2": "#d8d2c2"
+      },
+      "motif": "empire-of-the-wolf",
+      "pattern": "rays",
+      "notes": "Imperial bronze and bone-white banners."
+    },
+    "ctf-01-night-of-the-kraken": {
+      "era": "12th",
+      "palette": {
+        "accent": "#ff7a1c",
+        "accent2": "#2fb7ad"
+      },
+      "motif": "night-of-the-kraken",
+      "pattern": "waves",
+      "notes": "Lighthouse beam over a storm-lit Cornish sea: sonic-orange accent with cold teal, on the Twelfth Doctor's near-black chalkboard base."
+    },
+    "ctf-02-terror-moon": {
+      "era": "12th",
+      "palette": {
+        "accent": "#d97a2f",
+        "accent2": "#8f9bb3"
+      },
+      "motif": "terror-moon",
+      "pattern": "rings",
+      "notes": "Moon orange over crater grey."
+    }
+  }
+}

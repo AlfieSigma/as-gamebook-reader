@@ -1,0 +1,2503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gamebook</title>
+<style>
+/* AS Gamebook Reader - shared TARDIS blue theme. English UI only. */
+:root {
+  --tardis: #00203c;
+  --tardis-deep: #001224;
+  --tardis-panel: #0b2e4f;
+  --tardis-line: #2a5a86;
+  --gold: #c9a24a;
+  --gold-bright: #e8c870;
+  --text: #e9f1f8;
+  --text-dim: #9fb8cc;
+  --death: #d0453a;
+  --bad: #e08a2e;
+  --neutral: #8a97a3;
+  --good: #4fae6a;
+  --radius: 10px;
+  --maxw: 720px;
+  /* Themeable surfaces. Defaults are the original TARDIS-blue values; a book
+     theme overrides these tokens without touching the shared layout. */
+  --tardis-glow: #0a3a66;
+  --btn-top: #144a78;
+  --btn-bottom: #0d3a61;
+  --btn-primary-top: #3d6ea0;
+  --btn-primary-bottom: #1c4c79;
+  --btn-ghost-bg: rgba(11,46,79,.55);
+  --gold-glow-12: rgba(201,162,74,.12);
+  --gold-glow-35: rgba(201,162,74,.35);
+  --gold-glow-40: rgba(201,162,74,.4);
+  --gold-glow-70: rgba(232,200,112,.7);
+  --gold-glow-80: rgba(232,200,112,.8);
+  --card-grad-a: rgba(11,46,79,.85);
+  --card-grad-b: rgba(0,18,36,.92);
+  --card-inset: rgba(42,90,134,.15);
+  --topbar-bg: rgba(0,20,40,.92);
+  --seg-bg: rgba(0,18,36,.5);
+  --hover-bg: rgba(42,90,134,.25);
+  --hover-bg-strong: rgba(42,90,134,.35);
+  --hover-bg-soft: rgba(42,90,134,.22);
+  --active-bg: rgba(42,90,134,.55);
+  --tag-bg: rgba(42,90,134,.28);
+  --panel-bg: #061a30;
+  --panel-grad-a: #0c3357;
+  --panel-grad-b: #061d34;
+  --fade-mid: rgba(0,16,32,.9);
+  --overlay: rgba(0,8,18,.72);
+  --menu-bg: rgba(0,18,36,.6);
+  --popup-bg: rgba(6,29,52,.95);
+  --line-soft: rgba(42,90,134,.5);
+  --line-solid: rgba(42,90,134,.6);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, var(--tardis-glow) 0%, transparent 60%),
+    linear-gradient(180deg, var(--tardis) 0%, var(--tardis-deep) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  /* rem-based so the reader-wide font-size setting on :root scales the
+     whole rem layout (default 16px root -> 17px body). */
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+
+#app { min-height: 100vh; }
+
+.screen[hidden],
+#title-screen[hidden],
+#chapter-screen[hidden] { display: none !important; }
+
+/* Honour the hidden attribute even on flex/inline-flex components such as
+   the icon buttons and segmented control moved to the overflow menu. */
+[hidden] { display: none !important; }
+
+/* ---------------- Buttons ---------------- */
+.btn {
+  appearance: none;
+  border: 1px solid var(--tardis-line);
+  background: linear-gradient(180deg, var(--btn-top), var(--btn-bottom));
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.62em 1.15em;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, transform .05s;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold-glow-35), 0 2px 10px rgba(0,0,0,.35);
+}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.btn-primary {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, var(--btn-primary-top), var(--btn-primary-bottom));
+  font-weight: 600;
+}
+.btn-primary:hover:not(:disabled) {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 14px var(--gold-glow-40);
+}
+.btn-ghost {
+  background: var(--btn-ghost-bg);
+}
+.btn-small { font-size: .82rem; padding: .4em .8em; }
+.btn-danger { border-color: #8a3a34; color: #ffc9c3; }
+.btn-danger:hover:not(:disabled) { border-color: var(--death); }
+
+.file-label { display: inline-block; }
+
+/* ---------------- Title screen ---------------- */
+#title-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.title-card {
+  width: min(560px, 100%);
+  text-align: center;
+  border: 1px solid var(--tardis-line);
+  border-radius: 16px;
+  padding: 44px 36px 34px;
+  background:
+    linear-gradient(180deg, var(--card-grad-a), var(--card-grad-b));
+  box-shadow: 0 18px 60px rgba(0,0,0,.5), inset 0 0 60px var(--card-inset);
+}
+.title-cover {
+  width: 190px;
+  max-width: 55%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0 auto 22px;
+  display: block;
+  box-shadow: 0 8px 28px rgba(0,0,0,.55), 0 0 0 1px var(--tardis-line);
+}
+.title-kicker {
+  text-transform: uppercase;
+  letter-spacing: .22em;
+  font-size: .72rem;
+  color: var(--text-dim);
+}
+.title-name {
+  margin: .15em 0 0;
+  font-size: clamp(2.6rem, 9vw, 4rem);
+  letter-spacing: .12em;
+  color: var(--gold-bright);
+  text-shadow: 0 0 26px var(--gold-glow-35);
+}
+.title-sub {
+  font-variant: small-caps;
+  letter-spacing: .14em;
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  margin-bottom: 30px;
+}
+.title-progress { margin: 0 auto 26px; max-width: 360px; }
+.progress-bar {
+  height: 8px;
+  border: 1px solid var(--tardis-line);
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(0,0,0,.35);
+}
+#title-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  transition: width .3s;
+}
+.progress-text {
+  margin-top: 6px;
+  font-size: .8rem;
+  color: var(--text-dim);
+  letter-spacing: .08em;
+}
+.title-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  max-width: 280px;
+  margin: 0 auto;
+}
+.title-note { margin-top: 18px; font-size: .78rem; color: var(--text-dim); }
+
+/* ---------------- Chapter screen ---------------- */
+#chapter-screen {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chapter-topbar {
+  position: relative;
+  flex: 0 0 auto;
+  top: auto;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 14px 0;
+  border-bottom: 1px solid var(--tardis-line);
+  background: var(--topbar-bg);
+  backdrop-filter: blur(4px);
+}
+/* Primary top-bar row: Undo | section | (spacer) | mode | tree | home.
+   Never collapses on scroll (stage 3.5-C requirement). */
+.topbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topbar-spacer { flex: 1 1 auto; }
+.chapter-no {
+  font-variant: small-caps;
+  letter-spacing: .18em;
+  font-size: .85rem;
+  color: var(--gold-bright);
+  white-space: nowrap;
+}
+
+/* Segmented Summary | Original control. */
+.seg-control {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--tardis-line);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--seg-bg);
+}
+.seg-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: .82rem;
+  letter-spacing: .04em;
+  padding: 8px 14px;
+  min-height: 40px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--tardis-line); }
+.seg-btn:hover:not(:disabled) { color: var(--text); background: var(--hover-bg); }
+.seg-btn.seg-active {
+  color: var(--gold-bright);
+  background: var(--active-bg);
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+.seg-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* Large touch-target icon buttons with a text label (>=40px). */
+.tb-icon-btn {
+  appearance: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 46px;
+  min-height: 46px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.tb-icon-btn:hover {
+  color: var(--gold-bright);
+  background: var(--tag-bg);
+  border-color: var(--tardis-line);
+}
+.tb-icon-btn .tb-icon { width: 20px; height: 20px; display: block; }
+.tb-icon-btn .tb-label {
+  font-size: .62rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* Secondary stat row: read percentage + endings counter. */
+.topbar-stat-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+}
+.chapter-progress {
+  font-variant-numeric: tabular-nums;
+  font-size: .76rem;
+  letter-spacing: .06em;
+  color: var(--text-dim);
+}
+.endings-counter {
+  font-variant-numeric: tabular-nums;
+  font-size: .74rem;
+  letter-spacing: .05em;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+/* Thin, always-on progress hairline on the bottom edge of the top bar. */
+.topbar-progress-track {
+  height: 3px;
+  margin: 0 -14px;
+  background: rgba(255,255,255,.07);
+}
+.topbar-progress-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  transition: width .25s ease;
+}
+.topbar-right { display: flex; gap: 8px; flex: 0 0 auto; align-items: center; }
+
+/* Overflow menu for top-bar items the user moved out of the persistent row
+   in Settings. Anchored to the top-right of the chapter top bar. */
+.tbmore-menu {
+  position: absolute;
+  top: calc(100% - 2px);
+  right: 12px;
+  z-index: 40;
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  background: var(--panel-bg);
+  box-shadow: 0 16px 44px rgba(0,0,0,.6);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tbmore-menu[hidden] { display: none !important; }
+.tbmore-item[hidden] { display: none !important; }
+.tbmore-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: .85rem;
+  color: var(--text);
+}
+.tbmore-item .tbmore-val { color: var(--gold-bright); font-variant-numeric: tabular-nums; }
+button.tbmore-item {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+button.tbmore-item:hover { background: var(--hover-bg-strong); }
+.tbmore-seg { display: flex; gap: 6px; }
+.tbmore-seg .seg-btn { min-height: 34px; padding: 6px 12px; }
+
+.chapter-body {
+  width: min(var(--maxw), 100%);
+  margin: 0 auto;
+  padding: 26px 22px 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* choices dock: the flex column's last item, so it stays pinned to the
+   bottom-right regardless of how long the section text is; main scrolls. */
+.choices-dock {
+  flex: 0 0 auto;
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  padding: 12px 22px 18px;
+  background: linear-gradient(180deg,
+    transparent 0%, var(--fade-mid) 40%, var(--tardis-deep) 100%);
+}
+.choices-dock-inner {
+  width: min(var(--maxw), 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.choices-dock .choices { margin-top: 0; }
+.choices-dock .ending-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+  gap: 10px;
+}
+.mechanic-note { margin-bottom: 4px; }
+@media (max-width: 560px) {
+  .choices-dock { padding: 10px 14px 14px; }
+}
+
+.prose p { margin: 0 0 1.05em; }
+.prose p:last-child { margin-bottom: 0; }
+.prose em { color: var(--gold-bright); }
+
+.chapter-prompt {
+  margin: 26px 0 14px;
+  font-variant: small-caps;
+  letter-spacing: .14em;
+  color: var(--gold-bright);
+  font-size: 1.02rem;
+}
+
+/* ---------------- Choices ---------------- */
+.choices {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.choice-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  width: 100%;
+  padding: .8em 1.05em;
+  font-size: .98rem;
+  line-height: 1.45;
+}
+.choice-bullet {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--gold);
+}
+.choice-label { flex: 1; }
+.choice-target {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold-bright);
+  font-weight: 600;
+  letter-spacing: .08em;
+}
+.choice-btn.is-puzzle { border-color: var(--gold); }
+
+/* randomisers (dice / coin) */
+.mechanic-note {
+  margin-top: 20px;
+  color: var(--text-dim);
+  font-size: .9rem;
+}
+.randomiser {
+  margin: 18px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.randomiser .random-output {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--gold-bright);
+  min-width: 2.2em;
+  text-align: center;
+  letter-spacing: .06em;
+}
+.random-output.rolling { animation: rattle .12s linear infinite; }
+@keyframes rattle {
+  0% { transform: rotate(-8deg) scale(1.05); }
+  50% { transform: rotate(7deg) scale(.96); }
+  100% { transform: rotate(-8deg) scale(1.05); }
+}
+.manual-divider {
+  margin: 14px 0 2px;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  color: var(--text-dim);
+}
+
+/* ---------------- Endings ---------------- */
+.ending-banner {
+  margin: 26px 0 8px;
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  text-align: center;
+  font-variant: small-caps;
+  letter-spacing: .22em;
+  font-size: 1.05rem;
+  border: 1px solid;
+}
+.ending-banner.et-death  { color: #ffd6d2; border-color: var(--death); background: rgba(208,69,58,.14); }
+.ending-banner.et-bad    { color: #ffe2c2; border-color: var(--bad);   background: rgba(224,138,46,.14); }
+.ending-banner.et-neutral{ color: #d7dee5; border-color: var(--neutral);background: rgba(138,151,163,.14); }
+.ending-banner.et-good   { color: #d3f3dc; border-color: var(--good);  background: rgba(79,174,106,.14); }
+
+.ending-actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+/* ---------------- Modal ---------------- */
+.modal-backdrop[hidden], .toast[hidden] { display: none; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: var(--overlay);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 36px 18px;
+  overflow-y: auto;
+}
+.modal {
+  width: min(520px, 100%);
+  border: 1px solid var(--tardis-line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--panel-grad-a), var(--panel-grad-b));
+  padding: 24px 24px 20px;
+  box-shadow: 0 20px 70px rgba(0,0,0,.6);
+}
+.modal h2 { margin: 0 0 12px; color: var(--gold-bright); letter-spacing: .08em; }
+.settings-block {
+  border-top: 1px solid var(--line-soft);
+  padding: 14px 0;
+}
+.settings-block h3 {
+  margin: 0 0 8px;
+  font-size: .82rem;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  color: var(--text-dim);
+}
+.settings-note { font-size: .85rem; color: var(--text-dim); margin-bottom: 10px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.modal-close-row { justify-content: flex-end; margin-top: 14px; }
+.settings-message { margin-top: 10px; font-size: .85rem; min-height: 1.2em; color: var(--gold-bright); }
+.settings-message.error { color: #ff9b93; }
+
+/* Global reader settings: font-size stepper and top-bar item toggles. */
+.fontsize-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fontsize-step {
+  width: 40px;
+  min-height: 40px;
+  font-size: 1.2rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex: 0 0 auto;
+}
+.fontsize-input {
+  width: 84px;
+  min-height: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--menu-bg);
+  border: 1px solid var(--tardis-line);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.fontsize-unit { color: var(--text-dim); font-size: .85rem; }
+.fontsize-reset {
+  margin-left: auto;
+  min-height: 36px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tbcheck-list { display: flex; flex-direction: column; gap: 2px; }
+.tbcheck {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .92rem;
+}
+.tbcheck:hover { background: var(--hover-bg-soft); }
+.tbcheck input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  accent-color: var(--gold);
+}
+.tbcheck .tbcheck-hint { color: var(--text-dim); font-size: .76rem; }
+
+/* ---------------- Toast ---------------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 10px 20px;
+  border: 1px solid var(--gold);
+  border-radius: 99px;
+  background: var(--popup-bg);
+  color: var(--text);
+  font-size: .9rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+}
+
+/* ---------------- Jump-back chooser ---------------- */
+.jumpback-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 52vh;
+  overflow-y: auto;
+  margin: 12px 0;
+}
+.jumpback-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line-solid);
+}
+.jumpback-no {
+  flex: 0 0 auto;
+  color: var(--gold-bright);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.jumpback-sum {
+  color: var(--text-dim);
+  font-size: .86rem;
+  line-height: 1.35;
+}
+
+/* ---------------- Phone viewport ---------------- */
+@media (max-width: 560px) {
+  .chapter-body { padding: 22px 16px 50px; }
+  .title-card { padding: 34px 22px 26px; }
+  .chapter-topbar { padding: 7px 10px 0; }
+  .topbar-progress-track { margin: 0 -10px; }
+
+  /* Narrow phones cannot fit Undo + section + segmented control + Tree +
+     Home + More on one line without pushing buttons off-screen. Let the
+     primary row wrap and drop the segmented control onto its own full-width
+     second line; the icon buttons always stay visible on line one. */
+  .topbar-row { flex-wrap: wrap; row-gap: 6px; }
+  #mode-switch {
+    order: 20;
+    flex-basis: 100%;
+    width: 100%;
+  }
+  #mode-switch .seg-btn { flex: 1 1 0; }
+  .chapter-no-label { display: none; }
+
+  .tb-icon-btn { min-width: 44px; min-height: 44px; padding: 4px 6px; }
+  .endings-counter, .chapter-progress { font-size: .68rem; }
+  .btn-small { font-size: .78rem; padding: .38em .65em; }
+  .randomiser { gap: 12px; }
+}
+
+/* Book theme: era base plus this book's accent pair. Layout is untouched. */
+:root {
+  --tardis: #071726;
+  --tardis-deep: #050f19;
+  --tardis-panel: #0c2438;
+  --tardis-line: #2a5a86;
+  --gold: #5b8fb9;
+  --gold-bright: #8fb3cf;
+  --text: #e8f1f8;
+  --text-dim: #93aec6;
+
+  --tardis-glow: #193146;
+  --btn-top: #153147;
+  --btn-bottom: #0d1e2d;
+  --btn-primary-top: #325776;
+  --btn-primary-bottom: #1f3e57;
+  --btn-ghost-bg: rgba(12,36,56,0.58);
+  --gold-glow-12: rgba(91,143,185,0.12);
+  --gold-glow-35: rgba(91,143,185,0.35);
+  --gold-glow-40: rgba(91,143,185,0.4);
+  --gold-glow-70: rgba(143,179,207,0.7);
+  --gold-glow-80: rgba(143,179,207,0.8);
+  --card-grad-a: rgba(29,60,84,0.9);
+  --card-grad-b: rgba(8,20,31,0.94);
+  --card-inset: rgba(91,143,185,0.15);
+  --topbar-bg: rgba(18,37,54,0.94);
+  --seg-bg: rgba(8,23,36,0.55);
+  --hover-bg: rgba(91,143,185,0.2);
+  --hover-bg-strong: rgba(91,143,185,0.3);
+  --hover-bg-soft: rgba(91,143,185,0.16);
+  --active-bg: rgba(91,143,185,0.35);
+  --tag-bg: rgba(91,143,185,0.2);
+  --panel-bg: #102333;
+  --panel-grad-a: #1d3c54;
+  --panel-grad-b: #0f2130;
+  --fade-mid: rgba(5,15,25,0.92);
+  --overlay: rgba(5,15,25,0.78);
+  --menu-bg: rgba(8,23,36,0.72);
+  --popup-bg: rgba(8,23,36,0.96);
+  --line-soft: rgba(42,90,134,0.5);
+  --line-solid: rgba(42,90,134,0.65);
+}
+body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #193146 0%, transparent 60%),
+    linear-gradient(180deg, var(--tardis) 0%, var(--tardis-deep) 100%);
+  background-attachment: fixed;
+}
+.title-links {
+  margin-top: 18px; display: flex; gap: 16px; flex-wrap: wrap;
+  font-size: .82rem; letter-spacing: .04em;
+}
+.title-links a {
+  color: var(--gold-bright); text-decoration: none;
+  border-bottom: 1px solid rgba(255,255,255,.28); padding-bottom: 2px;
+}
+.title-links a:hover { color: var(--text); border-bottom-color: var(--gold-bright); }
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== Title screen ===================== -->
+  <section id="title-screen" class="screen" hidden>
+    <div class="title-card">
+      <img id="title-cover" class="title-cover" alt="" hidden>
+      <div id="title-kicker" class="title-kicker">Interactive Gamebook</div>
+      <h1 id="title-name" class="title-name"></h1>
+      <div id="title-sub" class="title-sub"></div>
+      <div class="title-progress">
+        <div class="progress-bar"><div id="title-progress-fill"></div></div>
+        <div id="title-progress-text" class="progress-text">0.00% read</div>
+      </div>
+      <div class="title-actions">
+        <button id="btn-continue" class="btn btn-primary" data-i18n="continueWord" hidden>Continue</button>
+        <button id="btn-start" class="btn btn-primary" data-i18n="startNew">Start New</button>
+        <button id="btn-settings" class="btn btn-ghost" data-i18n="settingsWord">Settings</button>
+      </div>
+      <div id="title-save-note" class="title-note"></div><div class="title-links"><a href="../../index.html" data-i18n-html="backToShelf">&larr; Back to the shelf</a><a href="roadmap.html" data-i18n-html="fullRouteMap">Full route map &middot; full spoilers</a></div>
+    </div>
+  </section>
+
+  <!-- ===================== Chapter screen ===================== -->
+  <section id="chapter-screen" class="screen" hidden>
+    <header class="chapter-topbar">
+      <div class="topbar-row">
+        <div class="chapter-no" data-tbkey="section"><span class="chapter-no-label" data-i18n="sectionWord">Section </span><span id="chapter-num">000</span></div>
+        <div class="topbar-spacer"></div>
+
+        <div id="mode-switch" class="seg-control" data-tbkey="mode"
+             role="group" aria-label="Reading mode" data-i18n-aria="readingModeAria">
+          <button id="btn-mode-summary" type="button"
+                  class="seg-btn" aria-pressed="true" data-i18n="tbSummary">Summary</button>
+          <button id="btn-mode-original" type="button"
+                  class="seg-btn" aria-pressed="false" disabled
+                  title="Import the original text pack to enable this"
+                  data-i18n="tbOriginal" data-i18n-title="origTip">Original</button>
+        </div>
+
+        <button id="btn-tree" class="tb-icon-btn" type="button"
+                title="Open this book's route map" data-i18n-title="routeMapTip">
+          <svg class="tb-icon" viewBox="0 0 24 24" aria-hidden="true"
+               focusable="false"><path d="M12 3v5M12 8l-5 5M12 8l5 5M7 13v4M17 13v4M7 17v3M12 13v7M17 17v3"
+            fill="none" stroke="currentColor" stroke-width="1.7"
+            stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="tb-label" data-i18n="routeMapWord">Route map</span>
+        </button>
+        <button id="btn-home" class="tb-icon-btn" type="button"
+                title="Back to the shelf" data-tbkey="home">
+          <svg class="tb-icon" viewBox="0 0 24 24" aria-hidden="true"
+               focusable="false"><path d="M3.5 11.2L12 4l8.5 7.2M5.5 10v9.5h13V10"
+            fill="none" stroke="currentColor" stroke-width="1.7"
+            stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="tb-label" id="btn-home-label">Title</span>
+        </button>
+        <button id="btn-tbmore" class="tb-icon-btn" type="button"
+                title="More top bar items" data-i18n-title="moreTip" hidden>
+          <svg class="tb-icon" viewBox="0 0 24 24" aria-hidden="true"
+               focusable="false"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>
+          <span class="tb-label" data-i18n="moreWord">More</span>
+        </button>
+        <div id="tbmore-menu" class="tbmore-menu" hidden></div>
+      </div>
+      <div class="topbar-stat-row">
+        <span id="chapter-progress" class="chapter-progress" data-tbkey="progress"
+              title="Share of the book you have read" data-i18n-title="progressTip">0.00% read</span>
+        <span id="endings-counter" class="endings-counter" data-tbkey="endings"
+              title="Different endings you have reached" data-i18n-title="endingsTip">Endings found: 0</span>
+      </div>
+      <div class="topbar-progress-track" id="topbar-progress-track" data-tbkey="progress" aria-hidden="true">
+        <div id="topbar-progress-fill" class="topbar-progress-fill"></div>
+      </div>
+    </header>
+
+    <main class="chapter-body">
+      <article id="chapter-text" class="prose"></article>
+
+      <div id="ending-banner" class="ending-banner" hidden>
+        <span id="ending-banner-text"></span>
+      </div>
+    </main>
+
+    <div class="choices-dock">
+      <div class="choices-dock-inner">
+        <div id="mechanic-note" class="mechanic-note"></div>
+        <nav id="choices" class="choices"></nav>
+
+        <div id="ending-actions" class="ending-actions dock-actions">
+          <button id="btn-undo" class="btn btn-ghost" data-i18n="undoWord" data-i18n-title="undoTip" title="Undo the last move on this play line">Undo</button>
+          <button id="btn-ending-restart" class="btn btn-primary" hidden>Restart from 001</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Settings modal ===================== -->
+  <div id="settings-backdrop" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <h2 id="settings-title" data-i18n="settingsWord">Settings</h2>
+
+      <div class="settings-block">
+        <h3 data-i18n="fontSizeTitle">Reading font size</h3>
+        <div class="fontsize-row">
+          <button id="btn-font-dec" class="btn btn-ghost fontsize-step" type="button"
+                  aria-label="Decrease font size" data-i18n-aria="fontDecAria">&minus;</button>
+          <input id="font-size-input" class="fontsize-input" type="number"
+                 min="12" max="32" step="1" inputmode="numeric" value="16"
+                 aria-label="Reading font size in pixels" data-i18n-aria="fontInputAria">
+          <button id="btn-font-inc" class="btn btn-ghost fontsize-step" type="button"
+                  aria-label="Increase font size" data-i18n-aria="fontIncAria">+</button>
+          <span class="fontsize-unit">px</span>
+          <button id="btn-font-reset" class="btn btn-small btn-ghost fontsize-reset"
+                  type="button" data-i18n="resetWord">Reset</button>
+        </div>
+        <div class="settings-note" data-i18n="fontSizeNote">Applies to every book on this device. The reading text uses relative sizing, so 16&nbsp;px is the default.</div>
+      </div>
+
+      <div class="settings-block">
+        <h3 data-i18n="tbItemsTitle">Persistent top bar items</h3>
+        <div class="settings-note" data-i18n="tbItemsNote">Untick an item to move it into the top bar&rsquo;s &ldquo;More&rdquo; menu. Changes apply immediately and are remembered.</div>
+        <div class="tbcheck-list" id="tbcheck-list">
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="section" checked> <span data-i18n="tbcheckSection">Section number</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="progress" checked> <span data-i18n="tbcheckProgress">Reading progress &amp; bar</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="endings" checked> <span data-i18n="tbcheckEndings">Endings found counter</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="mode" checked> <span data-i18n="tbcheckMode">Summary / Original switch</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="home" checked> <span data-i18n="tbcheckHome">Shelf / Title button</span></label>
+        </div>
+      </div>
+
+      <div class="settings-block js-pack-block">
+        <h3 data-i18n="readingModeTitle">Reading mode</h3>
+        <div id="pack-status" class="settings-note">No original text pack loaded.</div>
+        <div class="settings-note" data-i18n="readingModeNote">Switch between Summary and Original any time using the segmented control in the top bar while reading.</div>
+        <label class="btn btn-small file-label js-standalone-only">
+          <span data-i18n="loadPack">Load text pack&hellip;</span>
+          <input id="file-pack" type="file" accept=".json,application/json" hidden>
+        </label>
+        <button id="btn-unload-pack" class="btn btn-small btn-danger js-standalone-only"
+                type="button" data-i18n="removePack" hidden>Remove text pack</button>
+      </div>
+
+      <div class="settings-block js-standalone-only">
+        <h3 data-i18n="saveTitle">Save</h3>
+        <div class="settings-note" data-i18n="saveNote">Progress is saved automatically in this browser, one save slot.</div>
+        <div class="btn-row">
+          <button id="btn-export" class="btn btn-small" data-i18n="exportSave">Export save&hellip;</button>
+          <label class="btn btn-small file-label">
+            <span data-i18n="importSave">Import save&hellip;</span>
+            <input id="file-save" type="file" accept=".json,application/json" hidden>
+          </label>
+          <button id="btn-clear" class="btn btn-small btn-danger" data-i18n="clearProgress">Clear all progress</button>
+          <button id="btn-reset-everything" class="btn btn-small btn-danger js-standalone-only" data-i18n="resetEverything">Reset everything (progress &amp; loaded pack)</button>
+        </div>
+      </div>
+
+      <div id="settings-message" class="settings-message"></div>
+
+      <div class="btn-row modal-close-row">
+        <button id="btn-settings-close" class="btn btn-primary" data-i18n="closeWord">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Jump-back chooser (Undo after a tree jump) ============ -->
+  <div id="jumpback-backdrop" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="jumpback-title">
+      <h2 id="jumpback-title" data-i18n="jumpbackTitle">Return to&hellip;</h2>
+      <p class="settings-note" data-i18n="jumpbackNote">
+        You reached this section from your story tree. More than one section
+        you have visited can lead here &mdash; choose which one to step back to.
+      </p>
+      <div id="jumpback-list" class="jumpback-list"></div>
+      <div class="btn-row modal-close-row">
+        <button id="btn-jumpback-cancel" class="btn btn-ghost" data-i18n="cancelWord">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+</div>
+
+<script>
+window.BOOK_DATA={"slug":"dyd-01-spaceship-graveyard","pack_kind":"dyd-01-spaceship-graveyard_text_pack","roadmap_url":"roadmap.html","book":"Doctor Who: The Spaceship Graveyard","start":1,"count":99,"total_words":17298,"icon":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMiAxMiI+PGNpcmNsZSBjeD0iNiIgY3k9IjYiIHI9IjQiIGZpbGw9IiNmZmZmZmYiLz48L3N2Zz4=","meta":{"slug":"dyd-01-spaceship-graveyard","title":"The Spaceship Graveyard","full_title":"Doctor Who: The Spaceship Graveyard","subtitle":"Decide Your Destiny","series":"Decide Your Destiny","series_number":1,"authors":null,"publisher":null,"release_date":"2007","cover":null,"kind":"gamebook"},"sections":{"1":{"p":null,"e":[[63,"choice","to the ship by a long rubber tube. lf the engines respond and fire back into activity"],[79,"choice","to 63. lf nothing happens'"]],"en":null,"s":"The time ship lurches violently, and the Doctor fastens the protagonist and Martha into seats while leaving himself free to work the controls. When the engines fall silent he desperately pumps a hand pump linked by a tube, with the outcome decided by whether the engines restart or stay dead.","w":300},"2":{"p":null,"e":[[69,"choice","Continue to section 69"],[10,"choice","to 69. lf they fire a warning shot"]],"en":null,"s":"The robot guards its system files and refuses access, so the Doctor uses his sonic screwdriver to freeze it into standby and begins scanning the controls for a better energy setting. Heavy footsteps signal the return of the earlier aliens, leaving the protagonist to shout a warning or wait for a warning shot.","w":148},"3":{"p":null,"e":[[33,"choice","If he speaks next"],[17,"choice","to 33. lf the Doctor speaks next"]],"en":null,"s":"The Doctor rejects the survivor's argument, but Dylun Kesh insists the machine must stop so his stranded group can repair their ships and leave. The ragged man then draws a laser weapon while the protagonist and Martha flank the Doctor, forcing a choice over who speaks first.","w":147},"4":{"p":null,"e":[[58,"choice","Continue to section 58"],[15,"choice","to 58. lf no one sees the Doctor"]],"en":null,"s":"Blown doors admit three armoured soldiers who demand the device that drained their ship's power, while the protagonist and Martha protest that it alone prevents a black hole from crushing the system. The Doctor quietly crosses to a master console and readies his sonic screwdriver, watched or unseen.","w":160},"5":{"p":null,"e":[[70,"choice","!f the Doctor speaks first"],[68,"choice","to 70. lf the alien speaks first"]],"en":null,"s":"The protagonist and companions flee through a stuck airlock, tumble onto the surface, and creep around the broken freighter while the silence stretches. Turning a corner brings them face to face with the three warriors again, and the scene hinges on who speaks first.","w":150},"6":{"p":null,"e":[[31,"choice","to answer this next"],[39,"choice","to 31. lf you hear an odd noise"]],"en":null,"s":"The alien warrior explains that his battleship was on a peace mission when unseen attackers struck without warning, and he quietly vows to avenge his fallen crew. The protagonist must decide whether to respond to his angry speech or react to an unexpected noise.","w":145},"7":{"p":null,"e":[[9,"choice","Continue to section 9"],[97,"choice","to 9. lf it rvas a human who helped you earlier"]],"en":null,"s":"Martha's phone call relays the Doctor's instruction to shut the alien machinery down permanently, and the companions begin the lengthy trek to the TARDIS. Martha pulls ahead, and as the protagonist lags someone seizes them from behind, with the identity of the earlier helper deciding what happens.","w":140},"8":{"p":null,"e":[[31,"choice","lf Martha speaks next"],[39,"choice","to 3 !. lf you hear an odd noise"]],"en":null,"s":"Through the ruined doorway the three warriors reappear, and their leader removes his helmet to expose a tiger-like face unlike the feline race the travellers met in the far future. The annoyed tiger demands answers, and the next move depends on whether Martha or a strange noise breaks the tension.","w":145},"9":{"p":null,"e":[],"en":null,"s":"The protagonist frees themself from Kudir, whose hostage plan collapses when a shot disarms him and the Doctor arrives with Space Police. The Doctor reveals that the promised medicine never existed and the cargo is a rare spice, then hands the alien over before the TARDIS resumes its bumpy journey.","w":295},"10":{"p":null,"e":[[37,"choice","lf the Black Hole disappears"],[99,"choice","to happen"]],"en":null,"s":"The leading warrior demands the power-draining device be switched off, and the Doctor surprisingly agrees, asking instead that every micron fusion warhead be launched. After restoring the warrior's communicator with his screwdriver, the Doctor fires the collected energy into the black hole, and the result decides the next scene.","w":285},"11":{"p":null,"e":[[72,"choice","to help me.' lf the Doctor asks what he can do"],[24,"choice","to 72.1f the warriors arrive"]],"en":null,"s":"The Doctor marvels at the vast machine and its hologram of a black hole until a robot called the Guardian explains that this complex protects the sector by draining power from passing ships. Survivors are treated and teleported, and the robot asks for help while the warriors close in.","w":285},"12":{"p":null,"e":[[53,"choice","to a cave"],[20,"choice","to a secret bunker"]],"en":null,"s":"The bedraggled survivor revives with water and introduces himself as Commander Dylun Kesh of the Imperial Space Marines, a detail the Doctor spots from his torn badge. After Martha teases the Doctor's fanboy knowledge, Kesh offers to show the travellers what wrecked the ships, leading either to a cave or a bunker.","w":153},"13":{"p":null,"e":[[35,"choice","lf the problem is a spaceship"],[67,"choice","If the problem is a planet"]],"en":null,"s":"Kesh rigs his weapon's power pack to overload and warns of a huge blast within ten seconds before running for the doors, but the Doctor calmly keeps everyone in place. The countdown passes with nothing happening, since the energy-sucking machinery simply absorbs the blast, leaving the nature of the real problem as the next choice.","w":142},"14":{"p":null,"e":[[78,"choice","to sound"],[4,"choice","to 78.|f the warriors arrive"]],"en":null,"s":"The robot explains that it was built to keep the Shield running but has grown lonely and now dreams of visiting other worlds, yet it cannot leave without a replacement. It pleads with the travellers for help, and the scene cuts to either an alarm or the arrival of the warriors.","w":148},"15":{"p":null,"e":[[85,"choice","to fire. lf you throw yourself at his legs"],[69,"choice","to 85. lf you call out a warning"]],"en":null,"s":"The Doctor quietly adjusts the controls and signals for silence, but the lead warrior catches the movement and demands an explanation. The Doctor asks about the warship's micron fission warheads and mentions the black hole, and as the warrior prepares to fire the protagonist must act.","w":146},"16":{"p":null,"e":[[69,"choice","Continue to section 69"],[10,"choice","to 69. lf they fire a warning shot"]],"en":null,"s":"The robot seats the Doctor at a central console and fits a helmet that visibly pains him while he jokes through clenched teeth. Once the helmet comes off and he moves to another console, heavy footsteps announce the earlier aliens, forcing a quick decision about warning them.","w":148},"17":{"p":null,"e":[[90,"choice","lf he has a grenade in his hand"],[13,"choice","to 90. lf he has done something with his energy vveapon"]],"en":null,"s":"Kesh levels his gun and orders the protagonist away from the controls, ignoring the Doctor's warning that shutting the machine down would cause massive destruction. While Martha asks for a plan, Kesh announces his intention to disable the device permanently, and his choice of weapon decides the branch.","w":142},"18":{"p":null,"e":[[22,"choice","to the floor. lf the lights go out"],[28,"choice","to 22.1f a sliding door opens"]],"en":null,"s":"The travellers walk a corridor built from linked metal rings until the Doctor energises a wall panel and reveals that the black rubber strip underfoot is a moving walkway. The pavement suddenly stops and throws everyone down, with the next scene set by either darkness or an opening door.","w":148},"19":{"p":null,"e":[[65,"choice","!f you duck back inside the ship"],[70,"choice","to reach you"]],"en":null,"s":"Outside, the group finds a vast graveyard of crashed spacecraft stretching to the horizon, and Martha points out a dark battleship with three armoured figures descending its ramp. The Doctor doubts they are Judoon, leaving the protagonist to either retreat inside the ship or wait for the strangers.","w":299},"20":{"p":null,"e":[[51,"choice","to show an image of local space. lf you see another planet"],[93,"choice","to 51. lf you see a spaceship"]],"en":null,"s":"Kudir leads the group down a long spiral stair into a buried hall of crackling machinery, where a computerised face reports containment holding at seventy per cent. Asked about the Breach, the screen shows local space, and what the travellers spot there directs the story.","w":293},"21":{"p":null,"e":[[95,"choice","to know mone about the ship"],[86,"choice","to explore more"]],"en":null,"s":"On an oval bridge lined with dusty workstations, the Doctor sniffs an unfamiliar smell and identifies the vessel as the Draconian ship Regal Prince, a craft that vanished mysteriously. Martha jokes about a curry house of the same name, and the travellers must choose between learning more or exploring further.","w":148},"22":{"p":null,"e":[[61,"choice","Continue to section 61"],[11,"choice","to 61. lf there is a massive chamber in front ofyou"]],"en":null,"s":"Darkness swallows the corridor until the Doctor finds a torch and uses his screwdriver to open a set of sliding doors onto an enormous lift. The doors reopen moments later, and what lies beyond decides whether someone is waiting or a vast chamber appears.","w":150},"23":{"p":null,"e":[[76,"choice","to speak"],[62,"choice","to speak"]],"en":null,"s":"A blue-skinned, four-armed creature holds the Doctor and Martha aloft until the protagonist shouts and grabs a rock to throw. The Doctor calls for patience and the alien releases its captives, with the next move belonging to either the creature or Martha.","w":143},"24":{"p":null,"e":[[58,"choice","Continue to section 58"],[15,"choice","to 58. lf no one sees the Doctor"]],"en":null,"s":"Armoured warriors burst in and demand the device that crippled their ship, but the robot explains the Guardian cannot be carried and the companions argue it keeps a black hole at bay. The Doctor again slips toward the master console with his screwdriver, and being spotted or unseen splits the path.","w":146},"25":{"p":null,"e":[[23,"choice","Continue to section 23"],[52,"choice","to 23. lf you discover the Doctor and Martha with a human surYivor"]],"en":null,"s":"A vast plain strewn with broken rockets convinces the Doctor that the power drain has operated for a long time, while the absence of any sound suggests the crews are gone. A sudden crash sends the Doctor around a wreck with Martha following, and the corner reveals either an alien or a human survivor.","w":292},"26":{"p":null,"e":[[45,"choice","Continue to section 45"],[38,"choice","to 45. lf Martha hears something moving"]],"en":null,"s":"With wind-up torches the Doctor leads the way outside, notes the low gravity and breathable air, and points out the TARDIS standing dead in the corner of a spaceship bridge. He remarks that they were not the first victims, and the next clue is either writing on a wall or a sound Martha hears.","w":147},"27":{"p":null,"e":[[31,"choice","to talk about you,' says the tiger, menacingly. lf Martha speaks next"],[39,"choice","to 31. lf you hear an odd noise"]],"en":null,"s":"The damaged door collapses and exposes the three warriors, whose leader removes his helmet to show a tiger-like face that the Doctor says belongs to a different feline race. The tiger would rather discuss the travellers, leaving Martha or an odd noise to speak next.","w":149},"28":{"p":null,"e":[[61,"choice","to open again. 'Take a look,'sugests the Doctor. lf there is someone waiting for you"],[11,"choice","to 61. lf there is a massive chamber in front of you"]],"en":null,"s":"The sliding doors reveal a large storeroom with no other exit, but Martha notices a gap at the threshold and guesses it is a lift. The Doctor steps in and presses the single button, and when the doors open again the scene depends on who or what lies beyond.","w":149},"29":{"p":null,"e":[[70,"choice","Continue to section 70"],[57,"choice","to 70. lf the coast is clear"]],"en":null,"s":"The companions retreat into the dim ship and the Doctor seals the outer airlock behind them with his screwdriver, buying time to run deeper. At a dead end the protagonist spots another hatch, and after the Doctor steps outside the group must face either waiting aliens or an open coast.","w":150},"30":{"p":null,"e":[[3,"choice","to be switched 0ff.' lf a human led you here"],[83,"choice","to 3. lf an alien led you here"]],"en":null,"s":"The screen shows an Earth-like world with a purple-and-orange atmosphere surrounded by satellites, and the Doctor explains that a vast space-time fault nearby would destroy the system without this machine. The alien Kudir still insists the power-draining device must be turned off, and the identity of the guide decides the branch.","w":146},"31":{"p":null,"e":[[46,"choice","Continue to section 46"],[18,"choice","to 46.,t you find a tunnel"]],"en":null,"s":"A siren shakes the ground and camouflaged doors slide apart, releasing a platform-mounted machine that fires crackling energy into the sky. The Doctor leaps aboard as the platform sinks, explaining it is a safety valve for surplus power, and where it stops presents a chamber or a tunnel.","w":295},"32":{"p":null,"e":[[39,"choice","to lose power.' lf you hear an odd noise"],[31,"choice","to 39. lf Martha speaks next"]],"en":null,"s":"The warrior studies the group and concedes they look harmless, yet insists someone must answer for the stolen power and the crash. The Doctor invites his story, and the soldier describes a detour forced by solar flares before his ship began losing power.","w":146},"33":{"p":null,"e":[[90,"choice","lf he has a grenade in his hand"],[13,"choice","to use his energy weapon"]],"en":null,"s":"Kesh keeps his weapon trained on the protagonist and forces everyone back from the console, and the Doctor quietly signals compliance while admitting no argument will stop him. After a wink to the companions the Doctor warns that the device is delicate, and Kesh's chosen weapon decides what follows.","w":144},"34":{"p":null,"e":[[87,"choice","if it has been ransacked"],[47,"choice","tomb"]],"en":null,"s":"A dark corridor leads to a half-open sliding door that the group squeezes through, and the Doctor senses an odd smell while doubting the vessel has flown in years. Beyond the gap lies the ship's bridge, whose condition is either ransacked or tomb-like.","w":142},"35":{"p":null,"e":[[73,"choice","Continue to section 73"],[42,"choice","to 73. lf nothing happens"]],"en":null,"s":"The screen shows the crippled ship trapped between hyperspace and normal space, and the protagonist's question prompts the Doctor to realise that completing the jump would seal the rift. He sets a plan to cut the machine for exactly thirty seconds, and the group waits anxiously to see if the vessel vanishes.","w":288},"36":{"p":null,"e":[[9,"choice","Continue to section 9"],[97,"choice","to 9. lf you met a human earlier"]],"en":null,"s":"Bullets force the group to split, with the Doctor and Martha diving one way and the protagonist another while the Doctor signals a rendezvous on the surface. Running through the entry corridor, the protagonist reaches open ground and is suddenly seized from behind.","w":156},"37":{"p":null,"e":[],"en":null,"s":"The Doctor explains that the black hole was actually a tear in the universe, healed by a burst of energy, and the warriors pledge to repair the robot and salvage the wrecks. The robot asks them to stay, yet the Doctor must take the protagonist home, and his final grin suggests more travel.","w":140},"38":{"p":null,"e":[[88,"choice","to study the writing more closely. lf the Doctor can read the message"],[94,"choice","to 88. lf he can't read the message"]],"en":null,"s":"Martha insists she heard something and leads the group along a corridor, where torchlight picks out a message scrawled in an alien script of squiggles and dots. With the TARDIS unable to translate without power, the Doctor puts on his glasses to attempt a reading.","w":147},"39":{"p":null,"e":[[46,"choice","lf you find a chamber full of alien technology"],[18,"choice","to 46.1f you find a tunnel"]],"en":null,"s":"Another siren opens the camouflaged doors and a blast of purple energy erupts, but the Doctor spots a staircase spiralling down and urges everyone below. The doors clang shut, leaving the warriors hammering above, and the descent ends at either a tech-filled chamber or a tunnel.","w":299},"40":{"p":null,"e":[[54,"choice","Continue to section 54"],[19,"choice","to 54. lf Martha leads the way"]],"en":null,"s":"Martha works through the captain's log until the final entry, which records grumbling about a meteorite storm followed by sudden power loss and crew members vanishing. The Doctor decides they need answers outside the ship, and a short search turns up an airlock with a choice of who leads.","w":149},"41":{"p":null,"e":[[23,"choice","to you. You turn the corner. lf you find the Doctor and Martha with an alien survivor"],[52,"choice","to 23. lf you discover the Doctor and Martha with a human survivor"]],"en":null,"s":"The Doctor overrides the powerless airlock and opens the outer doors onto an endless plain littered with broken spacecraft of every kind. Martha spots smoke rising behind a wreck, and after a tiring walk across the hilly graveyard the group rounds a corner.","w":293},"42":{"p":null,"e":[[92,"choice","to you by radio"],[7,"choice","to ring"]],"en":null,"s":"Nothing seems to happen as the thirty-second countdown ends, but Martha insists they honour the Doctor's limit and the protagonist restores the lever. The ship on the screen then vanishes, prompting cheers and the question of what comes next.","w":142},"43":{"p":null,"e":[[54,"choice","Continue to section 54"],[25,"choice","to 54. lf you lead the way"]],"en":null,"s":"The Doctor snatches the log and speed-reads it, learning that the captain was off duty when power failed and crew began disappearing. When the protagonist notes that none of them vanished, the Doctor decides to head outside for answers and an airlock is found.","w":148},"44":{"p":null,"e":[[38,"choice","lf Martha thinks she knows where the sound came from"],[74,"choice","to 38. lf no one is sure where it came from"]],"en":null,"s":"In a semicircular control room the Doctor activates the captain's log computer and identifies the vessel as a Terran freighter lost in Sector 42, an urban legend compared to the Bermuda Triangle. Distant movement interrupts, and whether Martha can pinpoint the sound decides the next scene.","w":146},"45":{"p":null,"e":[[89,"choice","lf the Doctor can read the message"],[94,"choice","to 89. lf he can't read the message"]],"en":null,"s":"The group finds more alien writing made of squiggles and dots, and Martha's suggestion that the TARDIS translate is ruled out because the ship lacks power. The Doctor claims a knack for languages and, glasses on, studies the message carefully.","w":148},"46":{"p":null,"e":[[48,"choice","to reveal a long tunnel.'We walk!' lf you find a lift"],[28,"choice","If a sliding door opens"]],"en":null,"s":"The chamber turns out to be packed with incomprehensible alien machinery that the Doctor calls a substation, insisting they must reach the heart of the complex. He opens a door onto a long tunnel and declares they will walk, though a lift or another door may speed the journey.","w":145},"47":{"p":null,"e":[[19,"choice","Continue to section 19"],[25,"choice","to 19. !f you go first"]],"en":null,"s":"The bridge proves cold and dead under a thick layer of dust, until the Doctor pulls a duster from his coat and cleans a wall plate to reveal a schematic map. He traces the route to the main airlock and proposes a look outside, with someone leading the way.","w":150},"48":{"p":null,"e":[[61,"choice","Continue to section 61"],[11,"choice","to 61. lf there is a massive chamber in front of you"]],"en":null,"s":"The Doctor opens the lift with his screwdriver and trades jokes about the tool's limits before pressing the single button. The doors reopen almost at once and, when the protagonist complains nothing happened, the Doctor simply bids them look outside.","w":148},"49":{"p":null,"e":[[53,"choice","to a caver"],[20,"choice","to a bunker"]],"en":null,"s":"The frightened survivor throws a bottle that knocks Martha down and bolts, but the Doctor catches him and offers water until he calms. He admits the same thing happened to him and offers to show what caused it, pointing either to a cave or a bunker.","w":154},"50":{"p":null,"e":[[44,"choice","to me... Right then, shall we explore?' lf you find the freighter's control room"],[84,"choice","to 44.lf you find the captain's cabin"]],"en":null,"s":"The opened door leads into a huge freighter hold where the Doctor identifies crates of English Breakfast Tea among Earth's exports and again notices a familiar smell he cannot place. He suggests exploring, and the group can seek either the control room or the captain's cabin.","w":151},"51":{"p":null,"e":[[3,"choice","to be switched 0ff.' lf a human led you here"],[83,"choice","If an alien led you here"]],"en":null,"s":"The screen shows Ursooma, a heavily populated world, beside a faint double image that the Doctor identifies as a space-time fault which this machine alone keeps from destroying the system. The guide nevertheless insists the device must be shut down, and their species settles the branch.","w":148},"52":{"p":null,"e":[[49,"choice","Continue to section 49"],[12,"choice","to become friendln"]],"en":null,"s":"A ragged, long-bearded survivor is reassured by the Doctor's peaceful gesture and croaks that the lifeboats could not launch for lack of power. Martha offers him water and jokes that she is almost a doctor, and his reaction decides whether he turns aggressive or friendly.","w":147},"53":{"p":null,"e":[[30,"choice","to life showing an image of local space. lf you see another planet"],[91,"choice","If you see a crippled spaceship"]],"en":null,"s":"Kudir guides the group uphill through the wrecks to a cave that opens into a metal hall filled with crackling coils, where the Doctor speed-reads data and grows alarmed. The stolen energy is mostly being routed elsewhere, and the screen showing local space offers a planet or a crippled ship next.","w":278},"54":{"p":null,"e":[[29,"choice","Continue to section 29"],[68,"choice","to reach you"]],"en":null,"s":"At the airlock the Doctor confirms breathable air, and the group steps onto a rocky plain of countless wrecked ships under a bruise-coloured sky. Three armoured figures descend from a gun-grey battleship, and the Doctor rules out Sontarans and Judoon before a choice of retreat or wait.","w":307},"55":{"p":null,"e":[[9,"choice","lf you met an alien earlier"],[97,"choice","to 9. lf you met a human earlier"]],"en":null,"s":"The protagonist runs until their lungs burn while the Doctor shows no effort and Martha teases that travelling with them demands fitness. Left briefly alone to catch their breath, the protagonist is suddenly grabbed from behind.","w":139},"56":{"p":null,"e":[[67,"choice","lf the problem is a planet"],[35,"choice","to 67. lf the problem is a spaceshiP"]],"en":null,"s":"The Doctor tells the desperate alien that the machine cannot be switched off without lasting damage, then promises to deliver the medical supplies himself if a solution is found. The alien remains unconvinced while the machine grounds every vessel, and the true problem's nature becomes the next choice.","w":147},"57":{"p":null,"e":[[68,"choice","Continue to section 68"],[70,"choice","to 68. !f the Doctor speaks first"]],"en":null,"s":"Back on the surface and clear of the aliens, the group notices that the wrecks cluster toward a distant tower, which the Doctor takes as a likely source of answers. Walking there, they round a corner into the aliens once more and raise their hands in surrender.","w":145},"58":{"p":null,"e":[[85,"choice","to fire. lf you throw yourself at his Iegs"],[69,"choice","If you call out a warning"]],"en":null,"s":"An armed soldier orders the Doctor away from the console, but the Doctor keeps working and asks whether the battleship carries micron fission warheads. Told it does, he admits he hates such weapons yet needs their energy, while the warrior primes his rifle and the protagonist must react.","w":145},"59":{"p":null,"e":[[82,"choice","to help him"],[56,"choice","to 82.lf the Doctor has an offer"]],"en":null,"s":"Kudir draws a weapon and explains that his ship holds emergency medicine for a plague ravaging his homeworld, enough to save millions if delivered soon. Martha questions the claim, and the choice falls between promising to help him and hearing the Doctor's counter-offer.","w":147},"60":{"p":null,"e":[[21,"choice","torches on full power you step out of the TARDIS. lf you've landed on a spaceship's bridge"],[80,"choice","to 2l.lf you're in a spaceship's hold"]],"en":null,"s":"Opening the door reveals only darkness, so the Doctor fetches hand-powered torches and explains that low energy should avoid attracting whatever drained the ship. They have landed inside a spacecraft on the planet's surface, and the interior is either a bridge or a hold.","w":151},"61":{"p":null,"e":[[14,"choice","to help me.' lf the Doctor asks what he can do"],[78,"choice","to 14. lf the warriors arrive"]],"en":null,"s":"A strange one-footed robot with a humanlike face leads the group to a screen showing a swirling anomaly and explains that the entire complex is a Shield protecting this sector from it. The energy drain keeps the Shield alive and survivors sit in suspended animation, and the robot believes the Doctor may help.","w":298},"62":{"p":null,"e":[[53,"choice","to a caver"],[20,"choice","to a bunker"]],"en":null,"s":"The alien apologises for the telepathic contact it used to learn the travellers' language and introduces itself as Kudir of the Kropil system, a merchant traveller downed four days ago. Martha brushes off her messy hair, and Kudir offers to show the group something that may explain the crashes.","w":153},"63":{"p":null,"e":[[26,"choice","to open the doors"],[50,"choice","to open the door"]],"en":null,"s":"The engines briefly revive at a higher pitch before the Doctor concludes that something on the planet below is draining their power, which he insists is impossible. A crunching landing ends the flight, and the next step is whether the Doctor can open the doors with the screwdriver or needs a crank.","w":155},"64":{"p":null,"e":[[8,"choice","to your feet. lf the door has been blown open'"],[27,"choice","to 8. lf the door is intact"]],"en":null,"s":"The group flees through doorways while the protagonist's torch dims and needs frantic winding, until the Doctor seals a metal door with his screwdriver. That door then rattles, leaks black smoke and explodes, throwing everyone down as the barrier either fails or holds.","w":153},"65":{"p":null,"e":[[64,"choice","Continue to section 64"],[5,"choice","to 64.1f you let Martha pull you away"]],"en":null,"s":"Safely back inside the airlock, the Doctor and Martha point opposite ways, and the protagonist's stumble knocks Martha to the floor as pursuing footsteps close in. A harsh white beam suddenly floods the room, and the choice is whom to follow as each companion pulls them.","w":151},"66":{"p":null,"e":[[54,"choice","to go first"],[34,"choice","to 54. lf you let the Doctor go first"]],"en":null,"s":"The group finds a lounge with half-finished meals and neatly placed chairs, which the Doctor reads as evidence of a sudden disappearance rather than a panicked exit. They then find another set of imposing doors, and the choice is who steps through first.","w":172},"67":{"p":null,"e":[[55,"choice","to the surface without seeing anyone"],[36,"choice","to 55. lf you get shot at"]],"en":null,"s":"The protagonist suggests that without the space-time fault the machine would be unnecessary, inspiring the Doctor to treat the anomaly as a wound and remove the too-tight shield. He gives the group thirty minutes to return to the TARDIS before the healing energy is released.","w":282},"68":{"p":null,"e":[[81,"choice","lf you speak nett"],[6,"choice","to 8!. lf the alien speaks next"]],"en":null,"s":"The lead alien warns that its translation software has acquired their language and demands total obedience, but the Doctor's disarming humour persuades the warriors to lower their rifles. The commander removes his helmet to reveal a craggy, wrinkled humanoid face, and who speaks first decides the branch.","w":147},"69":{"p":null,"e":[],"en":null,"s":"The protagonist's warning makes the soldiers seize them, and the Doctor insists he must detonate every warhead so the Guardian can absorb the blast and seal the rift. The gamble works, the anomaly vanishes and the grateful warriors offer to help the robot before the TARDIS departs.","w":290},"70":{"p":null,"e":[[32,"choice","Continue to section 32"],[75,"choice","If the Doctor answers him"]],"en":null,"s":"The Doctor protests that they are unarmed, and the central warrior removes his helmet to reveal a battle-scarred human with an eye patch who calls himself Terran born. Unimpressed by the Doctor's jokes about shops, the soldier demands to know why and how his ship was attacked.","w":149},"71":{"p":null,"e":[[21,"choice","Continue to section 21"],[66,"choice","to 21. lf you'ye found a mess room"]],"en":null,"s":"Frost coats the floor of a dark corridor and soon protagonist, Martha and even the Doctor are sliding and tumbling, with his bulky coat explained as padding for such moments. Recovering, they find heavy sliding doors frozen shut and need to work together to open them.","w":157},"72":{"p":null,"e":[[16,"choice","to the system computers: lf the robot allows him access"],[2,"choice","to 16. lf the robot cannot give access"]],"en":null,"s":"The robot explains that after a thousand years its circuits are corroding and asks to be replaced before it fails, prompting Martha to call it stress and the Doctor to call it more serious. The Doctor offers to seek another answer if it grants him access to the system computers.","w":147},"73":{"p":null,"e":[[92,"choice","to you by radio"],[7,"choice","to ring"]],"en":null,"s":"The ship vanishes on schedule, but the protagonist cannot shift the lever back and Martha has to add her weight before it finally moves. Relieved yet worried that the Doctor took too little time, they can only hope and wait for contact.","w":149},"74":{"p":null,"e":[[84,"choice","to part them. !f you find have entered another corridor"],[25,"choice","If you find yourselves outside the ship"]],"en":null,"s":"Silence returns and Martha wonders if they imagined the sound, but the Doctor insists something was there and notes that this ship crashed long ago. They reach grand double doors, loosen them with the screwdriver and haul them apart together.","w":146},"75":{"p":null,"e":[[39,"choice","Continue to section 39"],[31,"choice","to repln"]],"en":null,"s":"The Doctor defends his rambling and the warrior bluntly asks how the group arrived, so the Doctor explains their ship lost power and crashed. The soldier recognises the same story from his own homeward voyage after eighteen months of combat, and a sound or Martha's reply follows.","w":143},"76":{"p":null,"e":[[53,"choice","to a caver"],[20,"choice","to a bunker"]],"en":null,"s":"The alien explains that physical contact let him absorb their language, leaving Martha's hair sticky, and identifies himself as Kudir of the merchant race of Kropil before demanding his ship be released. Told the group only just arrived, he offers to show them a discovery that may explain the crashes.","w":150},"77":{"p":null,"e":[[21,"choice","Continue to section 21"],[19,"choice","to 21. lf you find yourselves outside the ship"]],"en":null,"s":"The protagonist observes that a ship deliberately crashed should have been looted, yet the cargo remains intact, earning the Doctor's praise. They then reach heavy double doors that need all hands to shift, and what lies beyond is either the bridge or open space outside.","w":145},"78":{"p":null,"e":[[58,"choice","lf one of the warriors sees him"],[15,"choice","to 58. lf the alien notices"]],"en":null,"s":"An alarm brings the three warriors running and they surround the group, the leader demanding the power-draining device while the weary robot hopefully asks if they have come to lift its burden. The Doctor quietly aims his screwdriver at nearby controls, and whether he is noticed decides the branch.","w":139},"79":{"p":null,"e":[[96,"choice","to open the doorsr"],[60,"choice","to open the doors"]],"en":null,"s":"The Doctor reports that something on the nearest planet is draining their power and orders an emergency landing, which ends with sparks, a bang and sudden silence. Now arrived somewhere unknown, the group must open the doors by screwdriver or by crank.","w":143},"80":{"p":null,"e":[[77,"choice","Continue to section 77"],[84,"choice","Continue to section 84"]],"en":null,"s":"The Doctor declares the space a freighter hold from around the twenty-fourth century, only for Martha to point out a shipping label that supplies the same details. He sniffs a familiar smell he cannot name and suggests exploring, offering a corridor or the captain's cabin.","w":144},"81":{"p":null,"e":[[31,"choice","to this"],[39,"choice","to 31. lf you are interrupted by a sudden noise"]],"en":null,"s":"The protagonist suggests they share the alien's plight, and after the Doctor explains their power loss the warrior agrees they may be fellow victims of a diplomatic mission meant to end a long war. He calls the unseen attackers cowards, and Martha's response or a sudden noise follows.","w":149},"82":{"p":null,"e":[[67,"choice","Continue to section 67"],[35,"choice","to 67.1t the problem involves a sPaceship'"]],"en":null,"s":"Martha promises the alien help and the Doctor agrees in principle that the TARDIS could deliver the medicine, though only if it works and the machine is switched off. The alien repeats his demand, the protagonist is aghast, and the Doctor grins that he will solve the local problem first.","w":145},"83":{"p":null,"e":[[82,"choice","to help him"],[56,"choice","to 82. lf the Doctor has an offer"]],"en":null,"s":"Martha challenges the alien's willingness to risk lives, and he answers that a plague on his homeworld has already killed thousands and that his hold carries the cure. His desperate sincerity convinces Martha, and the scene turns on whether she promises help or the Doctor makes an offer.","w":149},"84":{"p":null,"e":[[43,"choice","to study"],[40,"choice","to 43. lf Martha carries on reading"]],"en":null,"s":"The Doctor leads the way through a freezing corridor of dead lights and half-frozen doors into the captain's cabin, where Martha finds a handwritten log book. She learns the vessel was a cargo freighter, and the Doctor doubts pirates would have left the cargo behind.","w":147},"85":{"p":null,"e":[],"en":null,"s":"The protagonist tackles the warrior, spoiling his shot, while the Doctor remotely detonates every warhead in the crashed battleship and the Shield absorbs the energy. The anomaly vanishes, the Doctor explains it was a tear in the universe, and the grateful warriors salute before the group returns to the TARDIS.","w":298},"86":{"p":null,"e":[[41,"choice","If the doors are closedr"],[25,"choice","to 41. lf the doors are open"]],"en":null,"s":"The group returns into the dark ship, where the Doctor decides an airlock is the way out and claims to remember the layout of this class of vessel. His memory proves right when the airlock appears around the next corner, leaving only the question of whether its doors are open.","w":147},"87":{"p":null,"e":[[41,"choice","lf the doors are closed"],[19,"choice","to 41. lf the doors are open"]],"en":null,"s":"The semicircular bridge is stripped of every piece of advanced equipment, prompting the Doctor to observe that someone deliberately removed the high technology despite the lack of power. He digs out a schematic showing the main airlock near their position and suggests a look outside.","w":158},"88":{"p":null,"e":[[41,"choice","to go through the airlock first"],[54,"choice","to go first"]],"en":null,"s":"The Doctor struggles through the fiddly alien script and extracts a warning that the writer's colleagues simply disappeared, though he admits the translation may be imperfect. Abandoning the message, he finds the airlock the protagonist located and offers them first passage through it.","w":145},"89":{"p":null,"e":[[88,"choice","to an airlock and cal! the Doctor. lf the Doctor tells you more'"],[41,"choice","to 88. lf he decides you should explore through the airlock"]],"en":null,"s":"The Doctor identifies the message as a Hyanthorg explorer's log, complete with a digression about how galaxies are numbered, but the account cuts off just as the crew begin vanishing. The protagonist finds a door to an airlock, and the choice of whether the Doctor shares more or heads through splits the path.","w":146},"90":{"p":null,"e":[[35,"choice","lf the problem is a spaceship"],[67,"choice","to 35. lf the problem is a planet"]],"en":null,"s":"Kesh reveals a pineapple-shaped Grade Three Accelerator Grenade, warns of twenty seconds and flees, but the Doctor refuses to run and simply walks to the console where it sits. Martha counts down and nothing explodes, since the surrounding machinery acts as a vast energy vacuum.","w":149},"91":{"p":null,"e":[[3,"choice","to hold that ship in stuis.' 'Then we must shut it down!' lf a human led you here"],[83,"choice","to 3.lf an alien led you here"]],"en":null,"s":"The Doctor studies an ancient abandoned freighter that only the machine keeps from breaking apart, and notes it suffered a failure while leaving hyperspace. The machine is holding the ship in stasis with stolen energy, and the guide immediately demands it be shut down.","w":138},"92":{"p":null,"e":[[9,"choice","Continue to section 9"],[97,"choice","to 9. lf it was a human who helped you earlier"]],"en":null,"s":"A console speaker crackles with the Doctor's jokey disc-jockey greeting, and Martha explains his peculiar mood as a late-stage childhood before relaying that he has landed safely. Told it is safe to shut the machine down for good, the group walks back and the protagonist falls behind far enough to be grabbed.","w":152},"93":{"p":null,"e":[[59,"choice","to switch this machine 0ff,'says your helpful guide who led you here. lf he is an alien"],[98,"choice","to 59. lf he is human"]],"en":null,"s":"The battered old ship glows faintly red and the Doctor diagnoses a total systems failure in the instant it was leaving hyperspace, leaving it stranded in an unstable dimensional doorway. The helpful guide insists the machine must be switched off, and their species determines the branch.","w":150},"94":{"p":null,"e":[[41,"choice","to go first"],[19,"choice","to go first"]],"en":null,"s":"The Doctor sets the alien message aside and asks for a Plan B, which Martha supplies by suggesting they look outside the ship for the power drain's cause. He applauds her reasoning, and an airlock is found with the choice of who enters it first.","w":149},"95":{"p":null,"e":[[41,"choice","if the Doctor goes first"],[25,"choice","to 41. lf you go first"]],"en":null,"s":"The Doctor explains that a Draconian faction had sought a negotiated peace with the Earth Empire, and the vanished ship ironically did more for peace by sparking joint search-and-rescue cooperation. He then suggests finding an airlock and leaving, with the choice of who goes first.","w":146},"96":{"p":null,"e":[[71,"choice","Continue to section 71"],[34,"choice","to 7l.lf Martha leads the way"]],"en":null,"s":"With the door open but the view pitch black, the Doctor retrieves two compact wind-up torches from a hidden box and hands one over. He explains they are on the planet's surface but inside another spacecraft, and the darkness puzzles him.","w":149},"97":{"p":null,"e":[],"en":null,"s":"The protagonist wriggles free and finds their captor is the missing Space Marine Kesh, who wanted leverage before chasing them through the wreckage. The Doctor's call leads them to safety, where marines surround Kesh and the Doctor explains that stolen gems packed in aromatic jelly gave him away.","w":296},"98":{"p":null,"e":[[33,"choice","Continue to section 33"],[17,"choice","to 33. !f the Doctor speaks next"]],"en":null,"s":"Martha is appalled that Kesh would sacrifice millions to free his people, and he shrugs that no human colonies exist in this sector before admitting the price troubles him. The Doctor insists there must be another way, but Kesh levels his weapon and the next speaker decides the branch.","w":145},"99":{"p":null,"e":[],"en":null,"s":"The group waits until a great flash of light and the anomaly's disappearance confirm success, and the Doctor explains it was a tear in the universe that needed repairing. The warriors agree to help the robot salvage ships, and despite the request to stay the Doctor takes the protagonist home.","w":203}},"zh_ui_url":"../../assets/reader-zh.js?v=0e2b2b28"};
+
+</script>
+<script>
+/* AS Gamebook Reader - per-book reader runtime (shared template).
+ * Data: window.BOOK_DATA (slug, meta, structure + AI summaries), and
+ * optionally window.TEXT_PACK (full build) or a text pack stored in
+ * localStorage. All book-specific identity comes from BOOK_DATA; this file
+ * contains no hard-coded book names. Player-facing strings are English by
+ * default; a pack carrying "ui_locale": "zh" switches the whole UI to
+ * Chinese (see I18N / applyLocale).
+ *
+ * Two host modes:
+ *  - Standalone book package (skeleton/full HTML): BOOK_DATA is embedded in
+ *    the page; on DOMContentLoaded the reader mounts itself.
+ *  - Multi-book entry (as-gamebook-reader.html): the shelf calls
+ *    ASReader.mount(rootEl, bookData, textPack, hooks) when a book is opened
+ *    and ASReader.unmount(rootEl) when returning to the shelf. No globals
+ *    from one mounted book leak into the next.
+ */
+(function () {
+  "use strict";
+
+  function startReader(opts) {
+    // opts: { root, DATA, inlinePackSections (null unless full build),
+  var DATA = opts.DATA;
+  var ROOT = opts.root || document;
+  var HOOKS = opts.hooks || {};
+  var SLUG = DATA.slug;
+  var PACK_KIND = DATA.pack_kind || (SLUG + "_text_pack");
+  var SECTIONS = DATA.sections;
+  var TOTAL = DATA.count;
+  var TOTAL_WORDS = DATA.total_words || 0;
+  var START = DATA.start;
+  var ICON = DATA.icon;
+  var META = DATA.meta || {};
+
+  // Number of terminal sections (out-degree 0); used for the "all endings
+  // found" denominator only, which stays hidden until every one is reached.
+  var ENDING_TOTAL = (function () {
+    var n = 0;
+    Object.keys(SECTIONS).forEach(function (k) {
+      if (!SECTIONS[k].e.length) n++;
+    });
+    return n;
+  })();
+
+  var SAVE_KEY = SLUG + ".save.v1";
+  var PACK_KEY = SLUG + ".textpack.v1";
+  // Route map progress: a per-book list of every visited section number.
+  // roadmap.html reads the same key, so the map reveals only what was read.
+  var PROGRESS_KEY = "agb.progress.v1." + SLUG;
+  // Public book pages publish a roadmap beside index.html. Hosts without a
+  // map (private multi-book entry) leave this empty and hide the top-bar
+  // button instead of linking nowhere.
+  var ROADMAP_URL = DATA.roadmap_url || null;
+  var SAVE_EXPORT_NAME = SLUG + "_save.json";
+  var SAVE_VERSION = 2;
+
+  // ---------------- state ----------------
+  // stack: the current play line, stack[stack.length-1] is the current section.
+  // read: set of every section ever lit up (monotonic, survives new play lines).
+  // endings: sections reached that are terminals.
+  var state = null;
+  var mode = "summary";          // "summary" | "original"
+  var inlinePackSections = opts.inlinePackSections || null;
+  var textPack = inlinePackSections;
+  var inlinePack = !!textPack;
+  var pretendDate = null;        // null | "weekday" | "weekend" (session only)
+  var rollTimer = null;
+
+  // ---------------- UI localisation -------------------------------------
+  // English by default. A text pack may carry "ui_locale": "zh"; applyPack
+  // then switches every reader-generated string and the static template
+  // labels to Chinese. Packs without the field behave exactly as before.
+  var I18N = {
+    en: {
+      saveWriteFail: "Could not write the save (browser storage blocked).",
+      pctRead: "{pct}% read",
+      noteBuiltin: "Built-in full edition (private).",
+      notePack: "Original text pack loaded on this browser.",
+      noteSkeleton: "Skeleton edition: AI summaries only.",
+      noteProgress: " Progress saves automatically in this browser.",
+      endingsFound: "Endings found: {n}",
+      endingsAll: "Endings found: {n} / {total} \u2014 all found",
+      tbSection: "Section", tbRead: "Read",
+      tbSummary: "Summary", tbOriginal: "Original", tbShelf: "Shelf",
+      endDeath: "The End &mdash; Death",
+      endBad: "Bad Ending",
+      endNeutral: "The End",
+      endGood: "Good Ending &mdash; Mission Complete",
+      endRead: "{pct}% of the book read",
+      continueWord: "Continue",
+      puzzleDone: "I've worked out the number",
+      weekday: "weekday", weekend: "weekend",
+      dateReal: "Today is a <strong>{day}</strong>. ",
+      datePretend: "Today is a <s>{real}</s> &mdash; you are pretending it is a <strong>{fake}</strong>. ",
+      dateUseReal: "Use today's real date ({day})",
+      datePretendLink: "I'm pretending I'm reading on a {day}",
+      diceRoll: "Roll the dice",
+      diceResult: "You rolled a {n}.",
+      diceLucky: " Lucky 6!",
+      goTo: "{label} \u2014 go to {sec}",
+      coinToss: "Toss the coin",
+      heads: "Heads", tails: "Tails",
+      headsUp: "HEADS", tailsUp: "TAILS",
+      manualDivider: "Or decide the outcome yourself:",
+      statusBuiltin: "This is the built-in full edition: every section's original text is included. (Private build \u2014 do not share.)",
+      statusLoadedEn: "Loaded text pack: {book} ({n} sections, English).",
+      statusLoadedZh: "Loaded text pack: {book} ({n} sections, Chinese).",
+      statusNone: "No original text pack loaded. The skeleton plays with AI summaries only.",
+      entryStatusNone: "No original text pack imported for this book yet. Import the text pack from the book's menu on the shelf.",
+      noSave: "No save to export yet.",
+      saveImported: "Save imported. Continuing at section {sec}.",
+      saveBad: "That file is not a valid save for this book.",
+      packLoaded: "Text pack loaded ({n} sections).",
+      packBad: "That file is not a valid original text pack for this book.",
+      packUiMissing: "Could not load the Chinese interface. Check your connection and try again.",
+      clearConfirm: "Clear ALL reading progress in this browser? This cannot be undone.",
+      clearDone: "All progress cleared.",
+      gamebook: "Gamebook",
+      kicker: "Interactive Gamebook",
+      homeShelf: "Shelf", homeTitle: "Title",
+      homeShelfTip: "Back to the shelf",
+      homeTitleTip: "Back to the title screen",
+      restartFrom: "Restart from {sec}",
+      startNew: "Start New",
+      settingsWord: "Settings",
+      undoWord: "Undo",
+      undoTip: "Undo the last move on this play line",
+      sectionWord: "Section",
+      origTip: "Import the original text pack to enable this",
+      routeMapTip: "Open this book's route map",
+      routeMapWord: "Route map",
+      moreTip: "More top bar items",
+      moreWord: "More",
+      progressTip: "Share of the book you have read",
+      endingsTip: "Different endings you have reached",
+      backToShelf: "&larr; Back to the shelf",
+      fullRouteMap: "Full route map &middot; full spoilers",
+      fontSizeTitle: "Reading font size",
+      fontDecAria: "Decrease font size",
+      fontIncAria: "Increase font size",
+      fontInputAria: "Reading font size in pixels",
+      resetWord: "Reset",
+      fontSizeNote: "Applies to every book on this device. The reading text uses relative sizing, so 16\u00a0px is the default.",
+      tbItemsTitle: "Persistent top bar items",
+      tbItemsNote: "Untick an item to move it into the top bar\u2019s \u201cMore\u201d menu. Changes apply immediately and are remembered.",
+      tbcheckSection: "Section number",
+      tbcheckProgress: "Reading progress & bar",
+      tbcheckEndings: "Endings found counter",
+      tbcheckMode: "Summary / Original switch",
+      tbcheckHome: "Shelf / Title button",
+      readingModeTitle: "Reading mode",
+      readingModeAria: "Reading mode",
+      readingModeNote: "Switch between Summary and Original any time using the segmented control in the top bar while reading.",
+      loadPack: "Load text pack\u2026",
+      removePack: "Remove text pack",
+      removePackConfirm: "Remove the loaded text pack from this browser? The reader returns to the skeleton (AI summaries) and the interface switches back to English.",
+      resetEverything: "Reset everything (progress & loaded pack)",
+      resetEverythingConfirm: "Remove the loaded text pack AND clear all reading progress for this book in this browser? This cannot be undone.",
+      saveTitle: "Save",
+      saveNote: "Progress is saved automatically in this browser, one save slot.",
+      exportSave: "Export save\u2026",
+      importSave: "Import save\u2026",
+      clearProgress: "Clear all progress",
+      closeWord: "Close",
+      jumpbackTitle: "Return to\u2026",
+      jumpbackNote: "More than one section you have visited can lead here \u2014 choose which one to step back to.",
+      cancelWord: "Cancel"
+    }
+  };
+  var uiLocale = "en";
+  // Chinese UI strings live in reader_zh.js and are fetched only when a pack
+  // actually switches the interface to Chinese. This keeps every English
+  // reading page free of Chinese text.
+  var zhI18nState = "idle"; // idle | loading | ready | failed
+  var zhI18nWaiters = [];
+  var ZH_UI_URL = DATA.zh_ui_url || "reader-zh.js";
+
+  function loadZhI18n(done) {
+    if (zhI18nState === "ready") { done(true); return; }
+    if (zhI18nState === "failed") { done(false); return; }
+    zhI18nWaiters.push(done);
+    if (zhI18nState === "loading") return;
+    zhI18nState = "loading";
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = ZH_UI_URL;
+    s.onload = function () {
+      if (window.ASGR_I18N_ZH) {
+        I18N.zh = window.ASGR_I18N_ZH;
+        zhI18nState = "ready";
+      } else {
+        zhI18nState = "failed";
+      }
+      var waiters = zhI18nWaiters; zhI18nWaiters = [];
+      waiters.forEach(function (fn) { fn(zhI18nState === "ready"); });
+    };
+    s.onerror = function () {
+      zhI18nState = "failed";
+      var waiters = zhI18nWaiters; zhI18nWaiters = [];
+      waiters.forEach(function (fn) { fn(false); });
+    };
+    document.head.appendChild(s);
+  }
+
+  function ensureLocale(locale, done) {
+    if (locale !== "zh") { done(true); return; }
+    loadZhI18n(function (ok) {
+      if (!ok) uiLocale = "en";
+      done(ok);
+    });
+  }
+
+  // null | { book, sections, locale, builtIn }
+  var packInfo = null;
+  function t(key, vars) {
+    var dict = I18N[uiLocale];
+    var s = (dict && dict[key] != null) ? dict[key] : I18N.en[key];
+    if (s == null) return key;
+    if (vars) {
+      Object.keys(vars).forEach(function (k) {
+        s = String(s).split("{" + k + "}").join(vars[k]);
+      });
+    }
+    return s;
+  }
+
+  // ---------------- global reader settings (shared across all books) ----
+  // Stored under one tool-wide key: reading font size in px (applied to
+  // :root, scales the rem layout) and which chapter top-bar items stay
+  // persistent (unticked ones move into the "More" overflow menu).
+  var SETTINGS_KEY = "asgr.settings.v1";
+  var TB_KEYS = ["section", "progress", "endings", "mode", "home"];
+  var DEFAULT_SETTINGS = {
+    fontPx: 16,
+    tb: { section: true, progress: true, endings: true, mode: true, home: true }
+  };
+  var gSettings = loadGlobalSettings();
+
+  function loadGlobalSettings() {
+    var s;
+    try {
+      s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+    } catch (e) { s = {}; }
+    var font = parseInt(s.fontPx, 10);
+    if (!(font >= 12 && font <= 32)) font = 16;
+    var tb = {};
+    TB_KEYS.forEach(function (k) { tb[k] = s.tb && s.tb[k] === false ? false : true; });
+    return { fontPx: font, tb: tb };
+  }
+  function saveGlobalSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(gSettings)); }
+    catch (e) { /* storage blocked: apply for this session only */ }
+  }
+  function applyFontSize() {
+    document.documentElement.style.fontSize = gSettings.fontPx + "px";
+    var input = $("font-size-input");
+    if (input) input.value = gSettings.fontPx;
+  }
+
+  // ---------------- tiny helpers ----------------
+  // querySelector works on both Document (standalone package) and an Element
+  // container (multi-book entry mount); getElementById is Document-only.
+  function $(id) { return ROOT.querySelector("#" + id); }
+  function pad3(n) { return (n < 10 ? "00" : n < 100 ? "0" : "") + n; }
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function todayKind() {
+    var d = new Date().getDay();
+    return (d === 0 || d === 6) ? "weekend" : "weekday";
+  }
+  function packAvailable() { return !!textPack; }
+
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(function () { t.hidden = true; }, 2600);
+  }
+
+  // ---------------- persistence ----------------
+  function persist() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({
+        v: SAVE_VERSION,
+        cur: state.cur,
+        stack: state.stack,
+        read: Object.keys(state.read).map(Number),
+        endings: state.endings,
+        firstArrival: state.firstArrival || {},
+        jumps: state.jumps || []
+      }));
+    } catch (e) {
+      toast(t("saveWriteFail"));
+    }
+    writeProgress();
+  }
+
+  // Union the live read set with the history already stored for this book,
+  // keeping every visited section (nothing is trimmed) and putting the
+  // current section last: roadmap.html treats that last entry as "you are
+  // here" and reveals only its one-hop neighbours.
+  function writeProgress() {
+    var history = [];
+    var seen = {};
+    function keep(n) {
+      n = Number(n);
+      if (!SECTIONS.hasOwnProperty(String(n))) return;
+      if (seen[n]) return;
+      seen[n] = true;
+      history.push(n);
+    }
+    try {
+      var raw = localStorage.getItem(PROGRESS_KEY);
+      var stored = raw ? JSON.parse(raw) : [];
+      (Array.isArray(stored) ? stored : []).forEach(keep);
+    } catch (e) { /* ignore malformed history */ }
+    Object.keys(state.read).forEach(keep);
+    var cur = Number(state.cur);
+    var idx = history.indexOf(cur);
+    if (idx >= 0) history.splice(idx, 1);
+    if (SECTIONS.hasOwnProperty(String(cur))) history.push(cur);
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(history)); }
+    catch (e) { /* storage blocked: reading still works */ }
+  }
+
+  // Carry the stored history to the map as a URL fallback, in the same order
+  // (current section last). The map also reads PROGRESS_KEY directly.
+  function roadmapUrl() {
+    var history = [];
+    var seen = {};
+    function keep(n) {
+      n = Number(n);
+      if (!SECTIONS.hasOwnProperty(String(n))) return;
+      if (seen[n]) return;
+      seen[n] = true;
+      history.push(n);
+    }
+    try {
+      var raw = localStorage.getItem(PROGRESS_KEY);
+      var stored = raw ? JSON.parse(raw) : [];
+      (Array.isArray(stored) ? stored : []).forEach(keep);
+    } catch (e) { /* ignore */ }
+    Object.keys(state.read).forEach(keep);
+    var cur = Number(state.cur);
+    var idx = history.indexOf(cur);
+    if (idx >= 0) history.splice(idx, 1);
+    if (SECTIONS.hasOwnProperty(String(cur))) history.push(cur);
+    return ROADMAP_URL + "?visited=" + history.join(",");
+  }
+
+  function openRouteMap() {
+    if (!ROADMAP_URL) return;
+    window.location.href = roadmapUrl();
+  }
+
+  function loadSave() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (!obj || (obj.v !== 1 && obj.v !== SAVE_VERSION) ||
+          typeof obj.cur !== "number")
+        return null;
+      var read = {};
+      (obj.read || []).forEach(function (n) {
+        if (SECTIONS.hasOwnProperty(String(n))) read[n] = true;
+      });
+      if (!SECTIONS.hasOwnProperty(String(obj.cur))) return null;
+      var stack = (obj.stack || [obj.cur]).filter(function (n) {
+        return SECTIONS.hasOwnProperty(String(n));
+      });
+      if (!stack.length) stack = [obj.cur];
+      // firstArrival was introduced in v2. A v1 save has no parent data;
+      // its already-lit sections render at depth 0 (no edges) until new
+      // moves attach descendants. See sanitizeFirstArrival.
+      var firstArrival = sanitizeFirstArrival(obj.firstArrival || {}, read);
+      var jumps = sanitizeJumps(obj.jumps || [], stack.length);
+      return {
+        cur: obj.cur,
+        stack: stack,
+        read: read,
+        endings: (obj.endings || []).filter(function (n) {
+          return SECTIONS.hasOwnProperty(String(n));
+        }),
+        firstArrival: firstArrival,
+        jumps: jumps
+      };
+    } catch (e) { return null; }
+  }
+
+  // Stack indices entered via a story-tree jump. Older saves have none,
+  // which just gives ordinary linear Undo everywhere.
+  function sanitizeJumps(arr, stackLen) {
+    var seen = {};
+    var out = [];
+    (Array.isArray(arr) ? arr : []).forEach(function (n) {
+      n = Number(n);
+      if (n === (n | 0) && n >= 1 && n < stackLen && !seen[n]) {
+        seen[n] = true;
+        out.push(n);
+      }
+    });
+    return out.sort(function (a, b) { return a - b; });
+  }
+
+  // Keep only firstArrival entries whose section and parent are both lit
+  // and valid, and whose edge index exists on the parent. This prevents a
+  // tampered/imported save from breaking the tree layout.
+  function sanitizeFirstArrival(fa, read) {
+    var out = {};
+    Object.keys(fa).forEach(function (k) {
+      var sec = parseInt(k, 10);
+      if (!read[sec]) return;
+      var rec = fa[k];
+      if (!rec || typeof rec.parent !== "number") return;
+      if (!read[rec.parent] && rec.parent !== START) return;
+      var psec = SECTIONS[String(rec.parent)];
+      if (!psec || typeof rec.edgeIdx !== "number" ||
+          rec.edgeIdx < 0 || rec.edgeIdx >= psec.e.length) return;
+      if (psec.e[rec.edgeIdx][0] !== sec) return;
+      out[sec] = { parent: rec.parent, edgeIdx: rec.edgeIdx };
+    });
+    return out;
+  }
+
+  // Apply a loaded pack to the runtime: the body text always replaces
+  // textPack; an optional "structure" section (same shape as
+  // book_structure.json) additionally overlays the runtime SECTIONS'
+  // choice labels and prompts, so a localised pack can translate the
+  // options too. English packs without a structure behave exactly as
+  // before (structure overlay is purely additive).
+  function applyPack(packObj) {
+    textPack = packObj.sections;
+    inlinePack = false;
+    var locale = packObj.ui_locale === "zh" ? "zh" : "en";
+    uiLocale = locale;
+    packInfo = {
+      book: packObj.book || "",
+      sections: Object.keys(packObj.sections).length,
+      locale: locale
+    };
+    if (!packObj.structure || !packObj.structure.sections) return locale;
+    var ov = packObj.structure.sections;
+    for (var k in ov) {
+      var sec = SECTIONS[k];
+      var node = ov[k];
+      if (!sec || !node) continue;
+      if (node.prompt != null) sec.p = node.prompt;
+      if (Array.isArray(node.edges)) {
+        // Overlay labels by position, guarding on matching targets so a
+        // mis-ordered overlay can never corrupt a wrong edge.
+        for (var i = 0; i < node.edges.length && i < sec.e.length; i++) {
+          var oe = node.edges[i];
+          var se = sec.e[i];
+          if (oe.target === se[0] &&
+              (oe.kind === undefined || oe.kind === se[1]) &&
+              oe.label != null) {
+            se[2] = oe.label;
+          }
+        }
+      }
+    }
+    return locale;
+  }
+
+  // Host API used by the encrypted-vault front end: apply a pack that was
+  // decrypted in memory, switch the reading body to the original text and
+  // re-localise the whole reader. No storage is touched here; the caller
+  // keeps the pack only for the lifetime of the page. Resolves false when
+  // the Chinese UI asset could not be loaded.
+  function applyPackFromHost(packObj) {
+    var locale = packObj.ui_locale === "zh" ? "zh" : "en";
+    return new Promise(function (resolve) {
+      ensureLocale(locale, function (ok) {
+        if (!ok) { resolve(false); return; }
+        applyPack(packObj);
+        mode = "original";
+        refreshPackStatus();
+        applyLocale();
+        resolve(true);
+      });
+    });
+  }
+
+  function loadStoredPack() {
+    if (inlinePack) return null;
+    // Entry (multi-book) hosts keep text packs in IndexedDB and hand the
+    // sections over at mount time; standalone packages use localStorage.
+    if (HOOKS.providedPack) {
+      var provided = HOOKS.providedPack();
+      if (provided) {
+        // Entry hosts may hand over either a bare sections map (English
+        // packs) or a full pack object carrying a localised structure.
+        if (provided.sections) return provided;
+        textPack = provided;
+      }
+      return null;
+    }
+    try {
+      var raw = localStorage.getItem(PACK_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (obj && obj.kind === PACK_KIND && obj.sections) return obj;
+    } catch (e) { /* corrupt pack: ignore */ }
+    return null;
+  }
+
+  function freshState() {
+    return { cur: START, stack: [START], read: {}, endings: [],
+             firstArrival: {}, jumps: [] };
+  }
+
+  // ---------------- navigation ----------------
+  function gotoSection(target) {
+    target = Number(target);
+    if (!SECTIONS.hasOwnProperty(String(target))) return;
+    var firstVisit = !state.read[target];
+    if (firstVisit) {
+      // Keep the exact edge used for the first arrival in the save (older
+      // saves still carry this field even though the tree view is retired).
+      var from = state.cur;
+      var psec = SECTIONS[String(from)];
+      var idx = -1;
+      if (psec) {
+        for (var i = 0; i < psec.e.length; i++) {
+          if (psec.e[i][0] === target) { idx = i; break; }
+        }
+      }
+      if (idx >= 0) state.firstArrival[target] = { parent: from, edgeIdx: idx };
+    }
+    state.stack.push(target);
+    state.cur = target;
+    state.read[target] = true;
+    var sec = SECTIONS[String(target)];
+    if (!sec.e.length && sec.en && state.endings.indexOf(target) < 0) {
+      state.endings.push(target);
+    }
+    persist();
+    renderChapter();
+    window.scrollTo(0, 0);
+  }
+
+  // Undo: sections entered by an old tree-style teleport jump (legacy saves
+  // only) have no single "previous" section. Instead return to a section
+  // that can lead into the current one in the book graph and that the
+  // reader has already visited:
+  //   - exactly one such predecessor  -> step straight back to it
+  //   - several                        -> ask which one
+  //   - none                           -> fall back to the prior frame
+  // Frames reached by an ordinary choice undo linearly, as before.
+  function undo() {
+    if (state.stack.length <= 1) return;
+    var top = state.stack.length - 1;
+    if (state.jumps.indexOf(top) >= 0) {
+      var preds = readPredecessors(state.cur);
+      if (preds.length === 1) { stepBackTo(preds[0]); return; }
+      if (preds.length > 1) { openJumpBack(preds); return; }
+    }
+    state.stack.pop();
+    state.cur = state.stack[state.stack.length - 1];
+    state.jumps = (state.jumps || []).filter(function (k) { return k < top; });
+    persist();
+    renderChapter();
+    window.scrollTo(0, 0);
+  }
+
+  // All sections with an edge into `sec` that the reader has visited.
+  // Deterministic numeric order.
+  function readPredecessors(sec) {
+    var out = [];
+    Object.keys(SECTIONS).forEach(function (k) {
+      var p = Number(k);
+      if (!state.read[p]) return;
+      var edges = SECTIONS[k].e || [];
+      for (var i = 0; i < edges.length; i++) {
+        if (edges[i][0] === sec) { out.push(p); break; }
+      }
+    });
+    return out.sort(function (a, b) { return a - b; });
+  }
+
+  function jumpBackSnippet(sec) {
+    var d = SECTIONS[String(sec)];
+    var raw = d && d.s ? d.s : "";
+    var txt = String(raw).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    return txt.length > 90 ? txt.slice(0, 90) + "…" : txt;
+  }
+
+  // Ask which already-read predecessor of the current section to return to.
+  function openJumpBack(preds) {
+    var backdrop = $("jumpback-backdrop");
+    var list = $("jumpback-list");
+    list.innerHTML = "";
+    preds.forEach(function (sec) {
+      var b = document.createElement("button");
+      b.className = "jumpback-item btn btn-ghost";
+      b.type = "button";
+      b.innerHTML =
+        '<span class="jumpback-no">' + esc(pad3(sec)) + "</span>" +
+        '<span class="jumpback-sum">' + esc(jumpBackSnippet(sec)) + "</span>";
+      b.addEventListener("click", function () { stepBackTo(sec); });
+      list.appendChild(b);
+    });
+    backdrop.hidden = false;
+  }
+
+  function closeJumpBack() {
+    $("jumpback-backdrop").hidden = true;
+  }
+
+  // Replace the jump frame with the chosen predecessor (the teleported
+  // frame is consumed, so undoing again from there behaves normally).
+  function stepBackTo(sec) {
+    state.stack.pop();
+    state.stack.push(sec);
+    state.cur = sec;
+    var top = state.stack.length - 1;
+    state.jumps = (state.jumps || []).filter(function (k) { return k !== top; });
+    persist();
+    closeJumpBack();
+    renderChapter();
+    window.scrollTo(0, 0);
+  }
+
+  function startNewLine() {
+    state.stack = [START];
+    state.cur = START;
+    state.read[START] = true;
+    state.jumps = [];
+    persist();
+    showChapter();
+  }
+
+  // ---------------- rendering: screens ----------------
+  function showTitle() {
+    $("title-screen").hidden = false;
+    $("chapter-screen").hidden = true;
+    $("settings-backdrop").hidden = true;
+    var saved = loadSave();
+    var has = !!saved;
+    $("btn-continue").hidden = !has;
+    var readMap = state ? state.read : (saved ? saved.read : {});
+    var pct = pctOf(readMap).toFixed(2);
+    $("title-progress-fill").style.width = pct + "%";
+    $("title-progress-text").textContent = t("pctRead", { pct: pct });
+    $("title-save-note").textContent =
+      (inlinePack ? t("noteBuiltin") :
+       packAvailable() ? t("notePack") :
+       t("noteSkeleton")) +
+      t("noteProgress");
+  }
+
+  function showChapter() {
+    $("title-screen").hidden = true;
+    $("chapter-screen").hidden = false;
+    renderChapter();
+  }
+
+  // The old in-page story tree is retired: the top bar opens the book's
+  // full route map page instead (progress travels via localStorage and the
+  // ?visited= fallback).
+
+  // Progress = original-text characters of read sections / whole book.
+  // Falls back to section counting only if a build lacks word weights.
+  function readWords(readMap) {
+    var n = 0;
+    Object.keys(readMap).forEach(function (k) {
+      var sec = SECTIONS[k];
+      n += sec && typeof sec.w === "number" ? sec.w : 0;
+    });
+    return n;
+  }
+
+  function pctOf(readMap) {
+    if (TOTAL_WORDS > 0) return readWords(readMap) / TOTAL_WORDS * 100;
+    return Object.keys(readMap).length / TOTAL * 100;
+  }
+
+  function progressPct() {
+    return pctOf(state.read).toFixed(2);
+  }
+
+  // Always-on chapter top bar stats: weighted read percentage with a thin
+  // live progress bar, and the endings counter. The endings total is hidden
+  // until every ending has been reached ("Endings found: n / N - all found").
+  function updateTopbarStats() {
+    var pct = progressPct();
+    var pctEl = $("chapter-progress");
+    var fill = $("topbar-progress-fill");
+    if (pctEl) pctEl.textContent = t("pctRead", { pct: pct });
+    if (fill) fill.style.width = pct + "%";
+
+    var counter = $("endings-counter");
+    if (counter) {
+      var found = state.endings.length;
+      if (ENDING_TOTAL > 0 && found >= ENDING_TOTAL) {
+        counter.textContent =
+          t("endingsAll", { n: found, total: ENDING_TOTAL });
+      } else {
+        counter.textContent = t("endingsFound", { n: found });
+      }
+    }
+  }
+
+  // State of the Summary | Original segmented control in the chapter top bar.
+  function updateModeControl() {
+    var sum = $("btn-mode-summary");
+    var orig = $("btn-mode-original");
+    if (!sum || !orig) return;
+    var available = packAvailable();
+    orig.disabled = !available;
+    sum.classList.toggle("seg-active", mode === "summary");
+    orig.classList.toggle("seg-active", mode === "original");
+    sum.setAttribute("aria-pressed", mode === "summary" ? "true" : "false");
+    orig.setAttribute("aria-pressed", mode === "original" ? "true" : "false");
+    // overflow-menu proxies (visible only when the control is moved there)
+    var psum = $("tbmore-mode-summary"), porig = $("tbmore-mode-original");
+    if (psum && porig) {
+      porig.disabled = !available;
+      psum.classList.toggle("seg-active", mode === "summary");
+      porig.classList.toggle("seg-active", mode === "original");
+    }
+  }
+
+  // ---- persistent vs overflow ("More") top bar items ----
+  // Build the overflow menu's proxy nodes once. Each maps 1:1 to a
+  // data-tbkey item; applyTopbar() shows a proxy exactly when its primary
+  // item has been unticked in Settings.
+  function buildTbMoreMenu() {
+    var menu = $("tbmore-menu");
+    if (!menu || menu._built) return;
+    menu._built = true;
+    menu.innerHTML =
+      '<div class="tbmore-item" data-more="section">' + t("tbSection") +
+        '<span class="tbmore-val" id="tbmore-section">001</span></div>' +
+      '<div class="tbmore-item" data-more="progress">' + t("tbRead") +
+        '<span class="tbmore-val" id="tbmore-section-prog"></span></div>' +
+      '<div class="tbmore-item" data-more="endings" style="display:block">' +
+        '<span id="tbmore-endings">' + t("endingsFound", { n: 0 }) +
+        "</span></div>" +
+      '<div class="tbmore-item" data-more="mode">' +
+        '<div class="seg-control tbmore-seg">' +
+          '<button id="tbmore-mode-summary" type="button" class="seg-btn">' +
+            t("tbSummary") + '</button>' +
+          '<button id="tbmore-mode-original" type="button" class="seg-btn">' +
+            t("tbOriginal") + '</button>' +
+        '</div></div>' +
+      '<button type="button" class="tbmore-item" data-more="home">' +
+        '<span id="tbmore-home-label">' + t("tbShelf") + '</span></button>';
+    $("tbmore-mode-summary").addEventListener("click", function () {
+      setMode("summary");
+    });
+    $("tbmore-mode-original").addEventListener("click", function () {
+      setMode("original");
+    });
+    menu.querySelector('[data-more="home"]').addEventListener("click", goHome);
+  }
+
+  function applyTopbar() {
+    buildTbMoreMenu();
+    var anyHidden = false;
+    TB_KEYS.forEach(function (key) {
+      var persistent = gSettings.tb[key] !== false;
+      Array.prototype.forEach.call(
+        ROOT.querySelectorAll('[data-tbkey="' + key + '"]'),
+        function (el) { el.hidden = !persistent; });
+      var proxy = ROOT.querySelector('[data-more="' + key + '"]');
+      if (proxy) proxy.hidden = persistent;
+      if (!persistent) anyHidden = true;
+    });
+    var moreBtn = $("btn-tbmore");
+    if (moreBtn) moreBtn.hidden = !anyHidden;
+    var menu = $("tbmore-menu");
+    if (menu && !anyHidden) menu.hidden = true;
+  }
+
+  function syncTbMoreValues() {
+    var sec = $("tbmore-section");
+    if (sec) sec.textContent = pad3(state.cur);
+    var prog = $("tbmore-section-prog");
+    if (prog) prog.textContent = progressPct() + "%";
+    var en = $("tbmore-endings");
+    if (en) en.textContent = $("endings-counter").textContent;
+  }
+
+  function goHome() {
+    if (HOOKS.onHome) { HOOKS.onHome(); return; }
+    showTitle();
+  }
+
+  // ---------------- rendering: chapter ----------------
+  function renderChapter() {
+    var sec = SECTIONS[String(state.cur)];
+    $("chapter-num").textContent = pad3(state.cur);
+    updateTopbarStats();
+    syncTbMoreValues();
+    $("btn-undo").disabled = state.stack.length <= 1;
+
+    // body text
+    var box = $("chapter-text");
+    var html = "";
+    if (mode === "original" && packAvailable() &&
+        textPack[String(state.cur)]) {
+      var segs = textPack[String(state.cur)];
+      html = segs.map(function (g) {
+        return g.t === "p" ? "<p>" + g.html + "</p>" : "";
+      }).join("");
+    } else {
+      html = "<p>" + esc(sec.s) + "</p>";
+    }
+    box.innerHTML = html;
+    if (sec.p) {
+      box.insertAdjacentHTML("beforeend",
+        '<div class="chapter-prompt">' + esc(sec.p) + "</div>");
+    }
+
+    // Return to the top of the article on every chapter switch. The
+    // scroll container is .chapter-body (overflow-y: auto), not the
+    // window, so window.scrollTo() does not reset the reading position.
+    var bodyEl = document.querySelector(".chapter-body");
+    if (bodyEl) bodyEl.scrollTop = 0;
+    window.scrollTo(0, 0);
+
+    // reading-mode segmented control (Summary | Original)
+    updateModeControl();
+
+    var isEnding = !sec.e.length;
+    $("ending-banner").hidden = !isEnding;
+    // The dock action row is always present: Undo sits at the bottom-right
+    // next to the choices; Restart joins it only on an ending section.
+    var restartBtn = $("btn-ending-restart");
+    if (restartBtn) {
+      restartBtn.hidden = !isEnding;
+      if (isEnding) {
+        restartBtn.textContent = t("restartFrom", { sec: pad3(START) });
+      }
+    }
+    if (isEnding) renderEnding(sec);
+
+    $("mechanic-note").innerHTML = "";
+    var choices = $("choices");
+    choices.innerHTML = "";
+    if (!isEnding) renderEdges(sec, choices);
+  }
+
+  function renderEnding(sec) {
+    var banner = $("ending-banner");
+    banner.className = "ending-banner et-" + (sec.en || "neutral");
+    var labelKey = ({
+      death: "endDeath", bad: "endBad",
+      neutral: "endNeutral", good: "endGood"
+    })[sec.en || "neutral"];
+    $("ending-banner-text").innerHTML = t(labelKey) +
+      ' &middot; <span style="letter-spacing:.06em">' +
+      t("endRead", { pct: progressPct() }) + "</span>";
+  }
+
+  // ---------------- rendering: options & mechanics ----------------
+  function choiceButton(label, target, extraClass) {
+    var b = document.createElement("button");
+    b.className = "btn choice-btn" + (extraClass ? " " + extraClass : "");
+    b.innerHTML =
+      '<img class="choice-bullet" src="' + ICON + '" alt="">' +
+      '<span class="choice-label">' + esc(label) + "</span>" +
+      '<span class="choice-target">' + pad3(target) + "</span>";
+    b.addEventListener("click", function () { gotoSection(target); });
+    return b;
+  }
+
+  function renderEdges(sec, choices) {
+    var kinds = sec.e.map(function (e) { return e[1]; });
+    var note = $("mechanic-note");
+
+    if (kinds.indexOf("date") >= 0) { renderDate(sec, choices, note); return; }
+    if (kinds.indexOf("dice") >= 0) { renderDice(sec, choices, note); return; }
+    if (kinds.indexOf("coin") >= 0) { renderCoin(sec, choices, note); return; }
+
+    sec.e.forEach(function (edge) {
+      var target = edge[0], kind = edge[1], label = edge[2];
+      if (kind === "forced") {
+        choices.appendChild(choiceButton(t("continueWord"), target));
+      } else if (kind === "puzzle") {
+        // 056 secret door: no input box, no code shown, one confident button.
+        choices.appendChild(
+          choiceButton(t("puzzleDone"), target, "is-puzzle"));
+      } else if (kind === "choice") {
+        choices.appendChild(choiceButton(label, target));
+      }
+    });
+  }
+
+  // 034 - only the exit matching the effective date is rendered.
+  // Labels may be English ("weekday"/"weekend") or localised; the Chinese
+  // spellings are kept as escapes so the default bundle stays ASCII-only.
+  function renderDate(sec, choices, note) {
+    var real = todayKind();
+    var effective = pretendDate || real;
+    var edge = sec.e.filter(function (e) {
+      var l = e[2].toLowerCase();
+      if (effective === "weekday") {
+        return l.indexOf("weekday") >= 0 ||
+          l.indexOf("\u5de5\u4f5c\u65e5") >= 0;
+      }
+      return l.indexOf("weekend") >= 0 ||
+        l.indexOf("\u5468\u672b") >= 0;
+    })[0];
+
+    var realWord = t(real);
+    var pretendWord = t(real === "weekday" ? "weekend" : "weekday");
+
+    var html = pretendDate
+      ? t("datePretend", { real: realWord, fake: t(pretendDate) })
+      : t("dateReal", { day: realWord });
+    note.innerHTML = html;
+
+    var toggle = document.createElement("a");
+    toggle.href = "#";
+    toggle.className = "pretend-link";
+    toggle.textContent = pretendDate
+      ? t("dateUseReal", { day: realWord })
+      : t("datePretendLink", { day: pretendWord });
+    toggle.style.color = "var(--gold-bright)";
+    toggle.style.fontSize = ".88rem";
+    toggle.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      // Internal value stays the English enum; only rendering is localised.
+      pretendDate = pretendDate
+        ? null : (real === "weekday" ? "weekend" : "weekday");
+      renderChapter();
+    });
+    note.appendChild(document.createTextNode(" "));
+    note.appendChild(toggle);
+
+    choices.appendChild(choiceButton(edge[2], edge[0]));
+  }
+
+  // 009 - roll 1d6: 6 -> 018, anything else -> 087.
+  function renderDice(sec, choices, note) {
+    var win = sec.e.filter(function (e) { return e[0] === 18; })[0];
+    var lose = sec.e.filter(function (e) { return e[0] === 87; })[0];
+
+    var row = document.createElement("div");
+    row.className = "randomiser";
+    var rollBtn = document.createElement("button");
+    rollBtn.className = "btn btn-primary";
+    rollBtn.textContent = t("diceRoll");
+    var out = document.createElement("span");
+    out.className = "random-output";
+    out.textContent = "\u2022";
+    row.appendChild(rollBtn);
+    row.appendChild(out);
+    choices.appendChild(row);
+
+    rollBtn.addEventListener("click", function () {
+      rollBtn.disabled = true;
+      out.classList.add("rolling");
+      var ticks = 0;
+      clearInterval(rollTimer);
+      rollTimer = setInterval(function () {
+        out.textContent = String(1 + Math.floor(Math.random() * 6));
+        if (++ticks >= 8) {
+          clearInterval(rollTimer);
+          var n = 1 + Math.floor(Math.random() * 6);
+          out.classList.remove("rolling");
+          out.textContent = String(n);
+          var dest = n === 6 ? win : lose;
+          note.textContent = t("diceResult", { n: n }) +
+            (n === 6 ? t("diceLucky") : "");
+          setTimeout(function () { gotoSection(dest[0]); }, 850);
+        }
+      }, 90);
+    });
+
+    addManualDivider(choices);
+    choices.appendChild(choiceButton(
+      t("goTo", { label: win[2], sec: pad3(win[0]) }), win[0]));
+    choices.appendChild(choiceButton(
+      t("goTo", { label: lose[2], sec: pad3(lose[0]) }), lose[0]));
+  }
+
+  // 130 - fair coin: heads -> 091, tails -> 138.
+  function renderCoin(sec, choices, note) {
+    var heads = sec.e.filter(function (e) { return e[0] === 91; })[0];
+    var tails = sec.e.filter(function (e) { return e[0] === 138; })[0];
+
+    var row = document.createElement("div");
+    row.className = "randomiser";
+    var tossBtn = document.createElement("button");
+    tossBtn.className = "btn btn-primary";
+    tossBtn.textContent = t("coinToss");
+    var out = document.createElement("span");
+    out.className = "random-output";
+    out.textContent = "\u2022";
+    row.appendChild(tossBtn);
+    row.appendChild(out);
+    choices.appendChild(row);
+
+    tossBtn.addEventListener("click", function () {
+      tossBtn.disabled = true;
+      out.classList.add("rolling");
+      var ticks = 0;
+      clearInterval(rollTimer);
+      rollTimer = setInterval(function () {
+        out.textContent = ticks % 2 ? "H" : "T";
+        if (++ticks >= 9) {
+          clearInterval(rollTimer);
+          var headsUp = Math.random() < 0.5;
+          out.classList.remove("rolling");
+          out.textContent = headsUp ? t("headsUp") : t("tailsUp");
+          var dest = headsUp ? heads : tails;
+          setTimeout(function () { gotoSection(dest[0]); }, 850);
+        }
+      }, 90);
+    });
+
+    addManualDivider(choices);
+    choices.appendChild(choiceButton(
+      t("goTo", { label: t("heads"), sec: pad3(heads[0]) }), heads[0]));
+    choices.appendChild(choiceButton(
+      t("goTo", { label: t("tails"), sec: pad3(tails[0]) }), tails[0]));
+  }
+
+  function addManualDivider(choices) {
+    var d = document.createElement("div");
+    d.className = "manual-divider";
+    d.textContent = t("manualDivider");
+    choices.appendChild(d);
+  }
+
+  // ---------------- settings ----------------
+  function refreshPackStatus() {
+    var status = $("pack-status");
+    if (status) {
+      if (inlinePack) {
+        status.textContent = t("statusBuiltin");
+      } else if (packAvailable() && packInfo) {
+        status.textContent = t(packInfo.locale === "zh"
+          ? "statusLoadedZh" : "statusLoadedEn", {
+          book: packInfo.book || SLUG,
+          n: packInfo.sections
+        });
+      } else {
+        status.textContent = HOOKS.providedPack
+          ? t("entryStatusNone") : t("statusNone");
+      }
+    }
+    // The remove-pack button only makes sense for a localStorage-loaded
+    // pack in a standalone package (never for the built-in full edition).
+    var unloadBtn = $("btn-unload-pack");
+    if (unloadBtn) {
+      unloadBtn.hidden = inlinePack || HOOKS.providedPack ||
+        !packAvailable();
+    }
+    updateModeControl();
+  }
+
+  function setMode(m) {
+    if (m === "original" && !packAvailable()) return;
+    mode = m;
+    refreshPackStatus();
+    if (!$("chapter-screen").hidden) renderChapter();
+  }
+
+  function exportSave() {
+    var raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) { toast(t("noSave")); return; }
+    var blob = new Blob([raw], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = SAVE_EXPORT_NAME;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+  }
+
+  function importSave(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var msg = $("settings-message");
+      try {
+        var obj = JSON.parse(reader.result);
+        if (!obj || (obj.v !== 1 && obj.v !== SAVE_VERSION) ||
+            !SECTIONS.hasOwnProperty(String(obj.cur))) {
+          throw new Error("bad version");
+        }
+        var readArr = obj.read || [];
+        var readTmp = {};
+        readArr.forEach(function (n) {
+          if (SECTIONS.hasOwnProperty(String(n))) readTmp[n] = true;
+        });
+        var fa = sanitizeFirstArrival(obj.firstArrival || {}, readTmp);
+        localStorage.setItem(SAVE_KEY, JSON.stringify({
+          v: SAVE_VERSION,
+          cur: obj.cur,
+          stack: obj.stack || [obj.cur],
+          read: readArr,
+          endings: obj.endings || [],
+          firstArrival: fa,
+          jumps: sanitizeJumps(obj.jumps || [],
+                               (obj.stack || [obj.cur]).length)
+        }));
+        state = loadSave() || freshState();
+        msg.classList.remove("error");
+        msg.textContent = t("saveImported", { sec: pad3(state.cur) });
+        showTitle();
+      } catch (e) {
+        msg.classList.add("error");
+        msg.textContent = t("saveBad");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function importPack(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var msg = $("settings-message");
+      var obj;
+      try {
+        obj = JSON.parse(reader.result);
+        if (!obj || obj.kind !== PACK_KIND || !obj.sections) {
+          throw new Error("bad pack");
+        }
+      } catch (e) {
+        msg.classList.add("error");
+        msg.textContent = t("packBad");
+        return;
+      }
+      var locale = obj.ui_locale === "zh" ? "zh" : "en";
+      ensureLocale(locale, function (ok) {
+        if (!ok) {
+          msg.classList.add("error");
+          msg.textContent = t("packUiMissing");
+          return;
+        }
+        localStorage.setItem(PACK_KEY, JSON.stringify(obj));
+        applyPack(obj);
+        inlinePack = false;
+        msg.classList.remove("error");
+        msg.textContent = t("packLoaded", {
+          n: Object.keys(textPack).length
+        });
+        setMode("original");
+        applyLocale();
+        refreshPackStatus();
+      });
+    };
+    reader.readAsText(file);
+  }
+
+  // Remove the localStorage text pack. The runtime SECTIONS were mutated in
+  // place by applyPack, so a reload is the clean way to restore the embedded
+  // English structure (and the English UI).
+  function unloadPack() {
+    if (!window.confirm(t("removePackConfirm"))) return;
+    localStorage.removeItem(PACK_KEY);
+    location.reload();
+  }
+
+  // Wipe everything this HTML stored: the reading save AND the loaded pack.
+  // Global, cross-book reader settings (font size, top-bar layout) are shared
+  // by every book and are deliberately left untouched.
+  function resetEverything() {
+    if (!window.confirm(t("resetEverythingConfirm"))) return;
+    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(PACK_KEY);
+    localStorage.removeItem(PROGRESS_KEY);
+    location.reload();
+  }
+
+  // ---------------- wire-up ----------------
+  function bind() {
+    $("btn-continue").addEventListener("click", function () {
+      state = loadSave() || freshState();
+      showChapter();
+    });
+    $("btn-start").addEventListener("click", function () {
+      var saved = loadSave();
+      if (!saved) {
+        state = freshState();
+        state.read[START] = true;
+        persist();
+      } else {
+        state = saved;            // read set is monotonic
+        state.stack = [START];
+        state.cur = START;
+        state.read[START] = true;
+        persist();
+      }
+      showChapter();
+    });
+    $("btn-settings").addEventListener("click", function () {
+      $("settings-message").textContent = "";
+      refreshPackStatus();
+      $("settings-backdrop").hidden = false;
+    });
+    $("btn-settings-close").addEventListener("click", function () {
+      $("settings-backdrop").hidden = true;
+    });
+    $("settings-backdrop").addEventListener("click", function (ev) {
+      if (ev.target === this) this.hidden = true;
+    });
+
+    // The single Undo button lives in the bottom choices dock (id stays
+    // btn-undo whether or not it is an ending section).
+    $("btn-undo").addEventListener("click", undo);
+    $("btn-ending-restart").addEventListener("click", startNewLine);
+    var routeBtn = $("btn-tree");
+    if (routeBtn) {
+      if (ROADMAP_URL) routeBtn.addEventListener("click", openRouteMap);
+      else routeBtn.hidden = true;
+    }
+    $("btn-jumpback-cancel").addEventListener("click", closeJumpBack);
+    $("jumpback-backdrop").addEventListener("click", function (ev) {
+      if (ev.target === this) closeJumpBack();
+    });
+    $("btn-home").addEventListener("click", goHome);
+
+    // top bar overflow ("More") menu toggle
+    $("btn-tbmore").addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var menu = $("tbmore-menu");
+      menu.hidden = !menu.hidden;
+    });
+    ROOT.addEventListener("click", function (ev) {
+      var menu = $("tbmore-menu");
+      if (menu && !menu.hidden && !menu.contains(ev.target) &&
+          ev.target !== $("btn-tbmore") &&
+          !$("btn-tbmore").contains(ev.target)) {
+        menu.hidden = true;
+      }
+    });
+
+    // global settings: reading font size
+    function setFontPx(n) {
+      n = Math.max(12, Math.min(32, parseInt(n, 10) || 16));
+      gSettings.fontPx = n;
+      applyFontSize();
+      saveGlobalSettings();
+    }
+    $("font-size-input").addEventListener("change", function () {
+      setFontPx(this.value);
+    });
+    $("btn-font-dec").addEventListener("click", function () {
+      setFontPx(gSettings.fontPx - 1);
+    });
+    var btnFontInc = $("btn-font-inc");
+    if (btnFontInc) btnFontInc.addEventListener("click", function () {
+      setFontPx(gSettings.fontPx + 1);
+    });
+    $("btn-font-reset").addEventListener("click", function () {
+      setFontPx(DEFAULT_SETTINGS.fontPx);
+    });
+    // persistent top-bar item checkboxes
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-tbcheck]"), function (cb) {
+        cb.addEventListener("change", function () {
+          gSettings.tb[cb.getAttribute("data-tbcheck")] = cb.checked;
+          applyTopbar();
+          if (!$("chapter-screen").hidden) renderChapter();
+          saveGlobalSettings();
+        });
+      });
+
+    $("btn-mode-summary").addEventListener("click", function () {
+      setMode("summary");
+    });
+    $("btn-mode-original").addEventListener("click", function () {
+      setMode("original");
+    });
+
+    $("btn-export").addEventListener("click", exportSave);
+    $("file-save").addEventListener("change", function () {
+      if (this.files[0]) importSave(this.files[0]);
+      this.value = "";
+    });
+    $("file-pack").addEventListener("change", function () {
+      if (this.files[0]) importPack(this.files[0]);
+      this.value = "";
+    });
+    $("btn-clear").addEventListener("click", function () {
+      if (!window.confirm(t("clearConfirm"))) return;
+      localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(PROGRESS_KEY);
+      state = freshState();   // nothing lit, nothing persisted: true 0.00%
+      var msg = $("settings-message");
+      msg.classList.remove("error");
+      msg.textContent = t("clearDone");
+      showTitle();
+    });
+    var btnUnload = $("btn-unload-pack");
+    if (btnUnload) btnUnload.addEventListener("click", unloadPack);
+    var btnResetAll = $("btn-reset-everything");
+    if (btnResetAll) btnResetAll.addEventListener("click", resetEverything);
+  }
+
+  // ---------------- localisation application ----------------
+  // Static template labels carry data-i18n / data-i18n-html /
+  // data-i18n-title / data-i18n-aria attributes; applyLocale rewrites them
+  // whenever the active pack changes the UI language.
+  function localizeStatic() {
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n]"), function (el) {
+        el.textContent = t(el.getAttribute("data-i18n"));
+      });
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n-html]"), function (el) {
+        el.innerHTML = t(el.getAttribute("data-i18n-html"));
+      });
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n-title]"), function (el) {
+        el.title = t(el.getAttribute("data-i18n-title"));
+      });
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n-aria]"), function (el) {
+        el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria")));
+      });
+    // The restart button is hidden until an ending is reached, but keep its
+    // text localised so no English string survives in a Chinese DOM.
+    var restartBtn = $("btn-ending-restart");
+    if (restartBtn) {
+      restartBtn.textContent = t("restartFrom", { sec: pad3(START) });
+    }
+    document.documentElement.lang = uiLocale === "zh" ? "zh-CN" : "en";
+    try {
+      document.dispatchEvent(new CustomEvent("agb-localechange", {
+        detail: { locale: uiLocale }
+      }));
+    } catch (e) { /* older browsers: ignore */ }
+  }
+
+  function applyLocale() {
+    localizeStatic();
+    updateHomeLabels();
+    // The "More" overflow menu is built once; rebuild it in the new language.
+    var menu = $("tbmore-menu");
+    if (menu) { menu._built = false; menu.innerHTML = ""; }
+    applyTopbar();
+    if (!$("title-screen").hidden) showTitle();
+    if (!$("chapter-screen").hidden) renderChapter();
+  }
+
+  function updateHomeLabels() {
+    var homeLabel = $("btn-home-label");
+    var homeBtn = $("btn-home");
+    var homeMoreLabel = $("tbmore-home-label");
+    var homeText = HOOKS.onHome ? t("homeShelf") : t("homeTitle");
+    if (homeLabel) homeLabel.textContent = homeText;
+    if (homeMoreLabel) homeMoreLabel.textContent = homeText;
+    if (homeBtn) {
+      homeBtn.title = HOOKS.onHome ? t("homeShelfTip") : t("homeTitleTip");
+    }
+  }
+
+  // ---------------- boot ----------------
+  function renderBookIdentity() {
+    var name = META.title || DATA.book || t("gamebook");
+    $("title-name").textContent = name;
+    if (HOOKS.setTitle) { HOOKS.setTitle(META.full_title || name); }
+    else { document.title = META.full_title || name; }
+    var sub = META.subtitle || "";
+    $("title-sub").textContent = sub;
+    var kickerParts = [];
+    if (META.series) {
+      kickerParts.push(META.series +
+        (META.series_number ? " " + META.series_number : ""));
+    }
+    kickerParts.push(t("kicker"));
+    $("title-kicker").textContent = kickerParts.join(" \u00b7 ");
+    if (META.cover) $("title-cover").src = META.cover;
+    $("title-cover").hidden = !META.cover;
+
+    updateHomeLabels();
+
+    // In the multi-book entry, per-book actions (text pack import, save
+    // export/import/clear) live in the book card menu on the shelf, so the
+    // standalone-only Settings blocks are removed here.
+    if (HOOKS.providedPack) {
+      Array.prototype.forEach.call(
+        ROOT.querySelectorAll(".js-standalone-only"),
+        function (el) { el.remove(); });
+      var note = $("pack-status");
+      if (note && !packAvailable()) {
+        note.textContent = t("entryStatusNone");
+      }
+    }
+  }
+
+  function syncSettingsChecks() {
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-tbcheck]"), function (cb) {
+        var key = cb.getAttribute("data-tbcheck");
+        cb.checked = gSettings.tb[key] !== false;
+      });
+  }
+
+  // A route-map node links back with ?section=<n>. A section already in the
+  // save is restored as a jump (undo knows how to step back); an unvisited
+  // section is accepted only when it is a direct choice from the current
+  // section, so the map cannot write a false read path.
+  function openMapSection() {
+    var match = /(?:^|[?&])section=([0-9]+)/.exec(window.location.search || "");
+    if (!match) return;
+    var target = Number(match[1]);
+    var sec = SECTIONS[String(target)];
+    if (!sec) return;
+    if (target === state.cur) { showChapter(); return; }
+    var allowed = !!state.read[target];
+    if (!allowed) {
+      var cur = SECTIONS[String(state.cur)];
+      if (cur) {
+        for (var i = 0; i < cur.e.length; i++) {
+          if (cur.e[i][0] === target) { allowed = true; break; }
+        }
+      }
+    }
+    if (!allowed) return;
+    showChapter();
+    if (state.read[target]) {
+      state.stack.push(target);
+      state.cur = target;
+      state.jumps = state.jumps || [];
+      state.jumps.push(state.stack.length - 1);
+      persist();
+      renderChapter();
+      window.scrollTo(0, 0);
+    } else {
+      gotoSection(target);
+    }
+  }
+
+  function boot() {
+    var storedPack = loadStoredPack();
+    state = loadSave();
+    if (!state) {
+      state = freshState(); // title offers Start New; nothing persisted yet
+    } else {
+      writeProgress();      // carry an existing save into the map history
+    }
+    bind();
+    applyFontSize();
+    syncSettingsChecks();
+
+    function finish() {
+      localizeStatic();
+      applyTopbar();
+      renderBookIdentity();
+      refreshPackStatus();
+      showTitle();
+      openMapSection();
+    }
+
+    if (storedPack) {
+      var locale = storedPack.ui_locale === "zh" ? "zh" : "en";
+      ensureLocale(locale, function (ok) {
+        if (ok) applyPack(storedPack);
+        else uiLocale = "en";
+        finish();
+      });
+    } else {
+      finish();
+    }
+  }
+
+  if (opts.exposePackApi) {
+    window.AGBReader = { applyPack: applyPackFromHost };
+  }
+
+  // Mount boots the title screen and returns a small handle the host uses
+  // to tear the instance down (clears timers) when leaving the book.
+  boot();
+  return {
+    showChapter: showChapter,
+    unmount: function () { if (rollTimer) clearInterval(rollTimer); }
+  };
+  }
+
+  // ---------------- static helpers usable without a mounted reader -------
+  function makeController(opts) {
+    return startReader(opts);
+  }
+
+  // Shelf progress: compute weighted read percentage + has-save + endings
+  // found, directly from a save in localStorage (or an explicit save obj).
+  function progressInfo(DATA, saveObj) {
+    var sections = DATA.sections;
+    var totalWords = DATA.total_words || 0;
+    var total = DATA.count;
+    var readMap = {};
+    var endings = [];
+    var has = false;
+    var cur = null;
+    if (saveObj) {
+      has = true;
+      cur = saveObj.cur;
+      (saveObj.read || []).forEach(function (n) {
+        if (sections.hasOwnProperty(String(n))) readMap[n] = true;
+      });
+      endings = (saveObj.endings || []).filter(function (n) {
+        return sections.hasOwnProperty(String(n));
+      });
+    }
+    var words = 0;
+    Object.keys(readMap).forEach(function (k) {
+      var sec = sections[k];
+      if (sec && typeof sec.w === "number") words += sec.w;
+    });
+    var pct = totalWords > 0
+      ? words / totalWords * 100
+      : Object.keys(readMap).length / total * 100;
+    var endingTotal = 0;
+    Object.keys(sections).forEach(function (k) {
+      if (!sections[k].e.length) endingTotal++;
+    });
+    return {
+      hasSave: has, cur: cur, pct: pct,
+      readCount: Object.keys(readMap).length,
+      endingsFound: endings.length, endingTotal: endingTotal
+    };
+  }
+
+  function readSave(slug) {
+    try {
+      var raw = localStorage.getItem(slug + ".save.v1");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  window.ASReader = {
+    mount: function (rootEl, DATA, inlinePackSections, hooks) {
+      return makeController({
+        root: rootEl, DATA: DATA,
+        inlinePackSections: inlinePackSections || null,
+        hooks: hooks || null
+      });
+    },
+    progressInfo: progressInfo,
+    readSave: readSave
+  };
+
+  // Standalone package self-starts only when a book payload is embedded.
+  // The multi-book entry never defines window.BOOK_DATA, so this is inert
+  // there even though the same reader markup exists in its DOM.
+  if (window.BOOK_DATA) {
+    var inline = window.TEXT_PACK && window.TEXT_PACK.sections
+      ? window.TEXT_PACK.sections : null;
+    var runStandalone = function () {
+      makeController({
+        root: document, DATA: window.BOOK_DATA,
+        inlinePackSections: inline, hooks: null, exposePackApi: true
+      });
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", runStandalone);
+    } else {
+      runStandalone();
+    }
+  }
+})();
+
+</script>
+</body>
+</html>

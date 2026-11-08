@@ -1,0 +1,2503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gamebook</title>
+<style>
+/* AS Gamebook Reader - shared TARDIS blue theme. English UI only. */
+:root {
+  --tardis: #00203c;
+  --tardis-deep: #001224;
+  --tardis-panel: #0b2e4f;
+  --tardis-line: #2a5a86;
+  --gold: #c9a24a;
+  --gold-bright: #e8c870;
+  --text: #e9f1f8;
+  --text-dim: #9fb8cc;
+  --death: #d0453a;
+  --bad: #e08a2e;
+  --neutral: #8a97a3;
+  --good: #4fae6a;
+  --radius: 10px;
+  --maxw: 720px;
+  /* Themeable surfaces. Defaults are the original TARDIS-blue values; a book
+     theme overrides these tokens without touching the shared layout. */
+  --tardis-glow: #0a3a66;
+  --btn-top: #144a78;
+  --btn-bottom: #0d3a61;
+  --btn-primary-top: #3d6ea0;
+  --btn-primary-bottom: #1c4c79;
+  --btn-ghost-bg: rgba(11,46,79,.55);
+  --gold-glow-12: rgba(201,162,74,.12);
+  --gold-glow-35: rgba(201,162,74,.35);
+  --gold-glow-40: rgba(201,162,74,.4);
+  --gold-glow-70: rgba(232,200,112,.7);
+  --gold-glow-80: rgba(232,200,112,.8);
+  --card-grad-a: rgba(11,46,79,.85);
+  --card-grad-b: rgba(0,18,36,.92);
+  --card-inset: rgba(42,90,134,.15);
+  --topbar-bg: rgba(0,20,40,.92);
+  --seg-bg: rgba(0,18,36,.5);
+  --hover-bg: rgba(42,90,134,.25);
+  --hover-bg-strong: rgba(42,90,134,.35);
+  --hover-bg-soft: rgba(42,90,134,.22);
+  --active-bg: rgba(42,90,134,.55);
+  --tag-bg: rgba(42,90,134,.28);
+  --panel-bg: #061a30;
+  --panel-grad-a: #0c3357;
+  --panel-grad-b: #061d34;
+  --fade-mid: rgba(0,16,32,.9);
+  --overlay: rgba(0,8,18,.72);
+  --menu-bg: rgba(0,18,36,.6);
+  --popup-bg: rgba(6,29,52,.95);
+  --line-soft: rgba(42,90,134,.5);
+  --line-solid: rgba(42,90,134,.6);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, var(--tardis-glow) 0%, transparent 60%),
+    linear-gradient(180deg, var(--tardis) 0%, var(--tardis-deep) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  /* rem-based so the reader-wide font-size setting on :root scales the
+     whole rem layout (default 16px root -> 17px body). */
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+
+#app { min-height: 100vh; }
+
+.screen[hidden],
+#title-screen[hidden],
+#chapter-screen[hidden] { display: none !important; }
+
+/* Honour the hidden attribute even on flex/inline-flex components such as
+   the icon buttons and segmented control moved to the overflow menu. */
+[hidden] { display: none !important; }
+
+/* ---------------- Buttons ---------------- */
+.btn {
+  appearance: none;
+  border: 1px solid var(--tardis-line);
+  background: linear-gradient(180deg, var(--btn-top), var(--btn-bottom));
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.62em 1.15em;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, transform .05s;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold-glow-35), 0 2px 10px rgba(0,0,0,.35);
+}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.btn-primary {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, var(--btn-primary-top), var(--btn-primary-bottom));
+  font-weight: 600;
+}
+.btn-primary:hover:not(:disabled) {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 14px var(--gold-glow-40);
+}
+.btn-ghost {
+  background: var(--btn-ghost-bg);
+}
+.btn-small { font-size: .82rem; padding: .4em .8em; }
+.btn-danger { border-color: #8a3a34; color: #ffc9c3; }
+.btn-danger:hover:not(:disabled) { border-color: var(--death); }
+
+.file-label { display: inline-block; }
+
+/* ---------------- Title screen ---------------- */
+#title-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.title-card {
+  width: min(560px, 100%);
+  text-align: center;
+  border: 1px solid var(--tardis-line);
+  border-radius: 16px;
+  padding: 44px 36px 34px;
+  background:
+    linear-gradient(180deg, var(--card-grad-a), var(--card-grad-b));
+  box-shadow: 0 18px 60px rgba(0,0,0,.5), inset 0 0 60px var(--card-inset);
+}
+.title-cover {
+  width: 190px;
+  max-width: 55%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0 auto 22px;
+  display: block;
+  box-shadow: 0 8px 28px rgba(0,0,0,.55), 0 0 0 1px var(--tardis-line);
+}
+.title-kicker {
+  text-transform: uppercase;
+  letter-spacing: .22em;
+  font-size: .72rem;
+  color: var(--text-dim);
+}
+.title-name {
+  margin: .15em 0 0;
+  font-size: clamp(2.6rem, 9vw, 4rem);
+  letter-spacing: .12em;
+  color: var(--gold-bright);
+  text-shadow: 0 0 26px var(--gold-glow-35);
+}
+.title-sub {
+  font-variant: small-caps;
+  letter-spacing: .14em;
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  margin-bottom: 30px;
+}
+.title-progress { margin: 0 auto 26px; max-width: 360px; }
+.progress-bar {
+  height: 8px;
+  border: 1px solid var(--tardis-line);
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(0,0,0,.35);
+}
+#title-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  transition: width .3s;
+}
+.progress-text {
+  margin-top: 6px;
+  font-size: .8rem;
+  color: var(--text-dim);
+  letter-spacing: .08em;
+}
+.title-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  max-width: 280px;
+  margin: 0 auto;
+}
+.title-note { margin-top: 18px; font-size: .78rem; color: var(--text-dim); }
+
+/* ---------------- Chapter screen ---------------- */
+#chapter-screen {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chapter-topbar {
+  position: relative;
+  flex: 0 0 auto;
+  top: auto;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 14px 0;
+  border-bottom: 1px solid var(--tardis-line);
+  background: var(--topbar-bg);
+  backdrop-filter: blur(4px);
+}
+/* Primary top-bar row: Undo | section | (spacer) | mode | tree | home.
+   Never collapses on scroll (stage 3.5-C requirement). */
+.topbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topbar-spacer { flex: 1 1 auto; }
+.chapter-no {
+  font-variant: small-caps;
+  letter-spacing: .18em;
+  font-size: .85rem;
+  color: var(--gold-bright);
+  white-space: nowrap;
+}
+
+/* Segmented Summary | Original control. */
+.seg-control {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--tardis-line);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--seg-bg);
+}
+.seg-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: .82rem;
+  letter-spacing: .04em;
+  padding: 8px 14px;
+  min-height: 40px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--tardis-line); }
+.seg-btn:hover:not(:disabled) { color: var(--text); background: var(--hover-bg); }
+.seg-btn.seg-active {
+  color: var(--gold-bright);
+  background: var(--active-bg);
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+.seg-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* Large touch-target icon buttons with a text label (>=40px). */
+.tb-icon-btn {
+  appearance: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 46px;
+  min-height: 46px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.tb-icon-btn:hover {
+  color: var(--gold-bright);
+  background: var(--tag-bg);
+  border-color: var(--tardis-line);
+}
+.tb-icon-btn .tb-icon { width: 20px; height: 20px; display: block; }
+.tb-icon-btn .tb-label {
+  font-size: .62rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* Secondary stat row: read percentage + endings counter. */
+.topbar-stat-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+}
+.chapter-progress {
+  font-variant-numeric: tabular-nums;
+  font-size: .76rem;
+  letter-spacing: .06em;
+  color: var(--text-dim);
+}
+.endings-counter {
+  font-variant-numeric: tabular-nums;
+  font-size: .74rem;
+  letter-spacing: .05em;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+/* Thin, always-on progress hairline on the bottom edge of the top bar. */
+.topbar-progress-track {
+  height: 3px;
+  margin: 0 -14px;
+  background: rgba(255,255,255,.07);
+}
+.topbar-progress-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  transition: width .25s ease;
+}
+.topbar-right { display: flex; gap: 8px; flex: 0 0 auto; align-items: center; }
+
+/* Overflow menu for top-bar items the user moved out of the persistent row
+   in Settings. Anchored to the top-right of the chapter top bar. */
+.tbmore-menu {
+  position: absolute;
+  top: calc(100% - 2px);
+  right: 12px;
+  z-index: 40;
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  background: var(--panel-bg);
+  box-shadow: 0 16px 44px rgba(0,0,0,.6);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tbmore-menu[hidden] { display: none !important; }
+.tbmore-item[hidden] { display: none !important; }
+.tbmore-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: .85rem;
+  color: var(--text);
+}
+.tbmore-item .tbmore-val { color: var(--gold-bright); font-variant-numeric: tabular-nums; }
+button.tbmore-item {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+button.tbmore-item:hover { background: var(--hover-bg-strong); }
+.tbmore-seg { display: flex; gap: 6px; }
+.tbmore-seg .seg-btn { min-height: 34px; padding: 6px 12px; }
+
+.chapter-body {
+  width: min(var(--maxw), 100%);
+  margin: 0 auto;
+  padding: 26px 22px 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* choices dock: the flex column's last item, so it stays pinned to the
+   bottom-right regardless of how long the section text is; main scrolls. */
+.choices-dock {
+  flex: 0 0 auto;
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  padding: 12px 22px 18px;
+  background: linear-gradient(180deg,
+    transparent 0%, var(--fade-mid) 40%, var(--tardis-deep) 100%);
+}
+.choices-dock-inner {
+  width: min(var(--maxw), 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.choices-dock .choices { margin-top: 0; }
+.choices-dock .ending-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+  gap: 10px;
+}
+.mechanic-note { margin-bottom: 4px; }
+@media (max-width: 560px) {
+  .choices-dock { padding: 10px 14px 14px; }
+}
+
+.prose p { margin: 0 0 1.05em; }
+.prose p:last-child { margin-bottom: 0; }
+.prose em { color: var(--gold-bright); }
+
+.chapter-prompt {
+  margin: 26px 0 14px;
+  font-variant: small-caps;
+  letter-spacing: .14em;
+  color: var(--gold-bright);
+  font-size: 1.02rem;
+}
+
+/* ---------------- Choices ---------------- */
+.choices {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.choice-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  width: 100%;
+  padding: .8em 1.05em;
+  font-size: .98rem;
+  line-height: 1.45;
+}
+.choice-bullet {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--gold);
+}
+.choice-label { flex: 1; }
+.choice-target {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold-bright);
+  font-weight: 600;
+  letter-spacing: .08em;
+}
+.choice-btn.is-puzzle { border-color: var(--gold); }
+
+/* randomisers (dice / coin) */
+.mechanic-note {
+  margin-top: 20px;
+  color: var(--text-dim);
+  font-size: .9rem;
+}
+.randomiser {
+  margin: 18px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.randomiser .random-output {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--gold-bright);
+  min-width: 2.2em;
+  text-align: center;
+  letter-spacing: .06em;
+}
+.random-output.rolling { animation: rattle .12s linear infinite; }
+@keyframes rattle {
+  0% { transform: rotate(-8deg) scale(1.05); }
+  50% { transform: rotate(7deg) scale(.96); }
+  100% { transform: rotate(-8deg) scale(1.05); }
+}
+.manual-divider {
+  margin: 14px 0 2px;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  color: var(--text-dim);
+}
+
+/* ---------------- Endings ---------------- */
+.ending-banner {
+  margin: 26px 0 8px;
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  text-align: center;
+  font-variant: small-caps;
+  letter-spacing: .22em;
+  font-size: 1.05rem;
+  border: 1px solid;
+}
+.ending-banner.et-death  { color: #ffd6d2; border-color: var(--death); background: rgba(208,69,58,.14); }
+.ending-banner.et-bad    { color: #ffe2c2; border-color: var(--bad);   background: rgba(224,138,46,.14); }
+.ending-banner.et-neutral{ color: #d7dee5; border-color: var(--neutral);background: rgba(138,151,163,.14); }
+.ending-banner.et-good   { color: #d3f3dc; border-color: var(--good);  background: rgba(79,174,106,.14); }
+
+.ending-actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+/* ---------------- Modal ---------------- */
+.modal-backdrop[hidden], .toast[hidden] { display: none; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: var(--overlay);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 36px 18px;
+  overflow-y: auto;
+}
+.modal {
+  width: min(520px, 100%);
+  border: 1px solid var(--tardis-line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--panel-grad-a), var(--panel-grad-b));
+  padding: 24px 24px 20px;
+  box-shadow: 0 20px 70px rgba(0,0,0,.6);
+}
+.modal h2 { margin: 0 0 12px; color: var(--gold-bright); letter-spacing: .08em; }
+.settings-block {
+  border-top: 1px solid var(--line-soft);
+  padding: 14px 0;
+}
+.settings-block h3 {
+  margin: 0 0 8px;
+  font-size: .82rem;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  color: var(--text-dim);
+}
+.settings-note { font-size: .85rem; color: var(--text-dim); margin-bottom: 10px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.modal-close-row { justify-content: flex-end; margin-top: 14px; }
+.settings-message { margin-top: 10px; font-size: .85rem; min-height: 1.2em; color: var(--gold-bright); }
+.settings-message.error { color: #ff9b93; }
+
+/* Global reader settings: font-size stepper and top-bar item toggles. */
+.fontsize-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fontsize-step {
+  width: 40px;
+  min-height: 40px;
+  font-size: 1.2rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex: 0 0 auto;
+}
+.fontsize-input {
+  width: 84px;
+  min-height: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--menu-bg);
+  border: 1px solid var(--tardis-line);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.fontsize-unit { color: var(--text-dim); font-size: .85rem; }
+.fontsize-reset {
+  margin-left: auto;
+  min-height: 36px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tbcheck-list { display: flex; flex-direction: column; gap: 2px; }
+.tbcheck {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .92rem;
+}
+.tbcheck:hover { background: var(--hover-bg-soft); }
+.tbcheck input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  accent-color: var(--gold);
+}
+.tbcheck .tbcheck-hint { color: var(--text-dim); font-size: .76rem; }
+
+/* ---------------- Toast ---------------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 10px 20px;
+  border: 1px solid var(--gold);
+  border-radius: 99px;
+  background: var(--popup-bg);
+  color: var(--text);
+  font-size: .9rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+}
+
+/* ---------------- Jump-back chooser ---------------- */
+.jumpback-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 52vh;
+  overflow-y: auto;
+  margin: 12px 0;
+}
+.jumpback-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line-solid);
+}
+.jumpback-no {
+  flex: 0 0 auto;
+  color: var(--gold-bright);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.jumpback-sum {
+  color: var(--text-dim);
+  font-size: .86rem;
+  line-height: 1.35;
+}
+
+/* ---------------- Phone viewport ---------------- */
+@media (max-width: 560px) {
+  .chapter-body { padding: 22px 16px 50px; }
+  .title-card { padding: 34px 22px 26px; }
+  .chapter-topbar { padding: 7px 10px 0; }
+  .topbar-progress-track { margin: 0 -10px; }
+
+  /* Narrow phones cannot fit Undo + section + segmented control + Tree +
+     Home + More on one line without pushing buttons off-screen. Let the
+     primary row wrap and drop the segmented control onto its own full-width
+     second line; the icon buttons always stay visible on line one. */
+  .topbar-row { flex-wrap: wrap; row-gap: 6px; }
+  #mode-switch {
+    order: 20;
+    flex-basis: 100%;
+    width: 100%;
+  }
+  #mode-switch .seg-btn { flex: 1 1 0; }
+  .chapter-no-label { display: none; }
+
+  .tb-icon-btn { min-width: 44px; min-height: 44px; padding: 4px 6px; }
+  .endings-counter, .chapter-progress { font-size: .68rem; }
+  .btn-small { font-size: .78rem; padding: .38em .65em; }
+  .randomiser { gap: 12px; }
+}
+
+/* Book theme: era base plus this book's accent pair. Layout is untouched. */
+:root {
+  --tardis: #071726;
+  --tardis-deep: #050f19;
+  --tardis-panel: #0c2438;
+  --tardis-line: #2a5a86;
+  --gold: #8f6bb0;
+  --gold-bright: #b39ac9;
+  --text: #e8f1f8;
+  --text-dim: #93aec6;
+
+  --tardis-glow: #252944;
+  --btn-top: #1c2d46;
+  --btn-bottom: #101c2c;
+  --btn-primary-top: #4b4672;
+  --btn-primary-bottom: #2b3555;
+  --btn-ghost-bg: rgba(12,36,56,0.58);
+  --gold-glow-12: rgba(143,107,176,0.12);
+  --gold-glow-35: rgba(143,107,176,0.35);
+  --gold-glow-40: rgba(143,107,176,0.4);
+  --gold-glow-70: rgba(179,154,201,0.7);
+  --gold-glow-80: rgba(179,154,201,0.8);
+  --card-grad-a: rgba(41,52,82,0.9);
+  --card-grad-b: rgba(11,19,31,0.94);
+  --card-inset: rgba(143,107,176,0.15);
+  --topbar-bg: rgba(24,33,53,0.94);
+  --seg-bg: rgba(8,23,36,0.55);
+  --hover-bg: rgba(143,107,176,0.2);
+  --hover-bg-strong: rgba(143,107,176,0.3);
+  --hover-bg-soft: rgba(143,107,176,0.16);
+  --active-bg: rgba(143,107,176,0.35);
+  --tag-bg: rgba(143,107,176,0.2);
+  --panel-bg: #161f32;
+  --panel-grad-a: #293452;
+  --panel-grad-b: #131e2f;
+  --fade-mid: rgba(5,15,25,0.92);
+  --overlay: rgba(5,15,25,0.78);
+  --menu-bg: rgba(8,23,36,0.72);
+  --popup-bg: rgba(8,23,36,0.96);
+  --line-soft: rgba(42,90,134,0.5);
+  --line-solid: rgba(42,90,134,0.65);
+}
+body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #252944 0%, transparent 60%),
+    linear-gradient(180deg, var(--tardis) 0%, var(--tardis-deep) 100%);
+  background-attachment: fixed;
+}
+.title-links {
+  margin-top: 18px; display: flex; gap: 16px; flex-wrap: wrap;
+  font-size: .82rem; letter-spacing: .04em;
+}
+.title-links a {
+  color: var(--gold-bright); text-decoration: none;
+  border-bottom: 1px solid rgba(255,255,255,.28); padding-bottom: 2px;
+}
+.title-links a:hover { color: var(--text); border-bottom-color: var(--gold-bright); }
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== Title screen ===================== -->
+  <section id="title-screen" class="screen" hidden>
+    <div class="title-card">
+      <img id="title-cover" class="title-cover" alt="" hidden>
+      <div id="title-kicker" class="title-kicker">Interactive Gamebook</div>
+      <h1 id="title-name" class="title-name"></h1>
+      <div id="title-sub" class="title-sub"></div>
+      <div class="title-progress">
+        <div class="progress-bar"><div id="title-progress-fill"></div></div>
+        <div id="title-progress-text" class="progress-text">0.00% read</div>
+      </div>
+      <div class="title-actions">
+        <button id="btn-continue" class="btn btn-primary" data-i18n="continueWord" hidden>Continue</button>
+        <button id="btn-start" class="btn btn-primary" data-i18n="startNew">Start New</button>
+        <button id="btn-settings" class="btn btn-ghost" data-i18n="settingsWord">Settings</button>
+      </div>
+      <div id="title-save-note" class="title-note"></div><div class="title-links"><a href="../../index.html" data-i18n-html="backToShelf">&larr; Back to the shelf</a><a href="roadmap.html" data-i18n-html="fullRouteMap">Full route map &middot; full spoilers</a></div>
+    </div>
+  </section>
+
+  <!-- ===================== Chapter screen ===================== -->
+  <section id="chapter-screen" class="screen" hidden>
+    <header class="chapter-topbar">
+      <div class="topbar-row">
+        <div class="chapter-no" data-tbkey="section"><span class="chapter-no-label" data-i18n="sectionWord">Section </span><span id="chapter-num">000</span></div>
+        <div class="topbar-spacer"></div>
+
+        <div id="mode-switch" class="seg-control" data-tbkey="mode"
+             role="group" aria-label="Reading mode" data-i18n-aria="readingModeAria">
+          <button id="btn-mode-summary" type="button"
+                  class="seg-btn" aria-pressed="true" data-i18n="tbSummary">Summary</button>
+          <button id="btn-mode-original" type="button"
+                  class="seg-btn" aria-pressed="false" disabled
+                  title="Import the original text pack to enable this"
+                  data-i18n="tbOriginal" data-i18n-title="origTip">Original</button>
+        </div>
+
+        <button id="btn-tree" class="tb-icon-btn" type="button"
+                title="Open this book's route map" data-i18n-title="routeMapTip">
+          <svg class="tb-icon" viewBox="0 0 24 24" aria-hidden="true"
+               focusable="false"><path d="M12 3v5M12 8l-5 5M12 8l5 5M7 13v4M17 13v4M7 17v3M12 13v7M17 17v3"
+            fill="none" stroke="currentColor" stroke-width="1.7"
+            stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="tb-label" data-i18n="routeMapWord">Route map</span>
+        </button>
+        <button id="btn-home" class="tb-icon-btn" type="button"
+                title="Back to the shelf" data-tbkey="home">
+          <svg class="tb-icon" viewBox="0 0 24 24" aria-hidden="true"
+               focusable="false"><path d="M3.5 11.2L12 4l8.5 7.2M5.5 10v9.5h13V10"
+            fill="none" stroke="currentColor" stroke-width="1.7"
+            stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="tb-label" id="btn-home-label">Title</span>
+        </button>
+        <button id="btn-tbmore" class="tb-icon-btn" type="button"
+                title="More top bar items" data-i18n-title="moreTip" hidden>
+          <svg class="tb-icon" viewBox="0 0 24 24" aria-hidden="true"
+               focusable="false"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>
+          <span class="tb-label" data-i18n="moreWord">More</span>
+        </button>
+        <div id="tbmore-menu" class="tbmore-menu" hidden></div>
+      </div>
+      <div class="topbar-stat-row">
+        <span id="chapter-progress" class="chapter-progress" data-tbkey="progress"
+              title="Share of the book you have read" data-i18n-title="progressTip">0.00% read</span>
+        <span id="endings-counter" class="endings-counter" data-tbkey="endings"
+              title="Different endings you have reached" data-i18n-title="endingsTip">Endings found: 0</span>
+      </div>
+      <div class="topbar-progress-track" id="topbar-progress-track" data-tbkey="progress" aria-hidden="true">
+        <div id="topbar-progress-fill" class="topbar-progress-fill"></div>
+      </div>
+    </header>
+
+    <main class="chapter-body">
+      <article id="chapter-text" class="prose"></article>
+
+      <div id="ending-banner" class="ending-banner" hidden>
+        <span id="ending-banner-text"></span>
+      </div>
+    </main>
+
+    <div class="choices-dock">
+      <div class="choices-dock-inner">
+        <div id="mechanic-note" class="mechanic-note"></div>
+        <nav id="choices" class="choices"></nav>
+
+        <div id="ending-actions" class="ending-actions dock-actions">
+          <button id="btn-undo" class="btn btn-ghost" data-i18n="undoWord" data-i18n-title="undoTip" title="Undo the last move on this play line">Undo</button>
+          <button id="btn-ending-restart" class="btn btn-primary" hidden>Restart from 001</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Settings modal ===================== -->
+  <div id="settings-backdrop" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <h2 id="settings-title" data-i18n="settingsWord">Settings</h2>
+
+      <div class="settings-block">
+        <h3 data-i18n="fontSizeTitle">Reading font size</h3>
+        <div class="fontsize-row">
+          <button id="btn-font-dec" class="btn btn-ghost fontsize-step" type="button"
+                  aria-label="Decrease font size" data-i18n-aria="fontDecAria">&minus;</button>
+          <input id="font-size-input" class="fontsize-input" type="number"
+                 min="12" max="32" step="1" inputmode="numeric" value="16"
+                 aria-label="Reading font size in pixels" data-i18n-aria="fontInputAria">
+          <button id="btn-font-inc" class="btn btn-ghost fontsize-step" type="button"
+                  aria-label="Increase font size" data-i18n-aria="fontIncAria">+</button>
+          <span class="fontsize-unit">px</span>
+          <button id="btn-font-reset" class="btn btn-small btn-ghost fontsize-reset"
+                  type="button" data-i18n="resetWord">Reset</button>
+        </div>
+        <div class="settings-note" data-i18n="fontSizeNote">Applies to every book on this device. The reading text uses relative sizing, so 16&nbsp;px is the default.</div>
+      </div>
+
+      <div class="settings-block">
+        <h3 data-i18n="tbItemsTitle">Persistent top bar items</h3>
+        <div class="settings-note" data-i18n="tbItemsNote">Untick an item to move it into the top bar&rsquo;s &ldquo;More&rdquo; menu. Changes apply immediately and are remembered.</div>
+        <div class="tbcheck-list" id="tbcheck-list">
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="section" checked> <span data-i18n="tbcheckSection">Section number</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="progress" checked> <span data-i18n="tbcheckProgress">Reading progress &amp; bar</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="endings" checked> <span data-i18n="tbcheckEndings">Endings found counter</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="mode" checked> <span data-i18n="tbcheckMode">Summary / Original switch</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="home" checked> <span data-i18n="tbcheckHome">Shelf / Title button</span></label>
+        </div>
+      </div>
+
+      <div class="settings-block js-pack-block">
+        <h3 data-i18n="readingModeTitle">Reading mode</h3>
+        <div id="pack-status" class="settings-note">No original text pack loaded.</div>
+        <div class="settings-note" data-i18n="readingModeNote">Switch between Summary and Original any time using the segmented control in the top bar while reading.</div>
+        <label class="btn btn-small file-label js-standalone-only">
+          <span data-i18n="loadPack">Load text pack&hellip;</span>
+          <input id="file-pack" type="file" accept=".json,application/json" hidden>
+        </label>
+        <button id="btn-unload-pack" class="btn btn-small btn-danger js-standalone-only"
+                type="button" data-i18n="removePack" hidden>Remove text pack</button>
+      </div>
+
+      <div class="settings-block js-standalone-only">
+        <h3 data-i18n="saveTitle">Save</h3>
+        <div class="settings-note" data-i18n="saveNote">Progress is saved automatically in this browser, one save slot.</div>
+        <div class="btn-row">
+          <button id="btn-export" class="btn btn-small" data-i18n="exportSave">Export save&hellip;</button>
+          <label class="btn btn-small file-label">
+            <span data-i18n="importSave">Import save&hellip;</span>
+            <input id="file-save" type="file" accept=".json,application/json" hidden>
+          </label>
+          <button id="btn-clear" class="btn btn-small btn-danger" data-i18n="clearProgress">Clear all progress</button>
+          <button id="btn-reset-everything" class="btn btn-small btn-danger js-standalone-only" data-i18n="resetEverything">Reset everything (progress &amp; loaded pack)</button>
+        </div>
+      </div>
+
+      <div id="settings-message" class="settings-message"></div>
+
+      <div class="btn-row modal-close-row">
+        <button id="btn-settings-close" class="btn btn-primary" data-i18n="closeWord">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Jump-back chooser (Undo after a tree jump) ============ -->
+  <div id="jumpback-backdrop" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="jumpback-title">
+      <h2 id="jumpback-title" data-i18n="jumpbackTitle">Return to&hellip;</h2>
+      <p class="settings-note" data-i18n="jumpbackNote">
+        You reached this section from your story tree. More than one section
+        you have visited can lead here &mdash; choose which one to step back to.
+      </p>
+      <div id="jumpback-list" class="jumpback-list"></div>
+      <div class="btn-row modal-close-row">
+        <button id="btn-jumpback-cancel" class="btn btn-ghost" data-i18n="cancelWord">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+</div>
+
+<script>
+window.BOOK_DATA={"slug":"dyd-10-second-skin","pack_kind":"dyd-10-second-skin_text_pack","roadmap_url":"roadmap.html","book":"Doctor Who: Second Skin","start":1,"count":94,"total_words":20087,"icon":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMiAxMiI+PGNpcmNsZSBjeD0iNiIgY3k9IjYiIHI9IjQiIGZpbGw9IiNmZmZmZmYiLz48L3N2Zz4=","meta":{"slug":"dyd-10-second-skin","title":"Second Skin","full_title":"Doctor Who: Second Skin","subtitle":"Decide Your Destiny","series":"Decide Your Destiny","series_number":10,"authors":null,"publisher":null,"release_date":"2008","cover":null,"kind":"gamebook"},"sections":{"1":{"p":null,"e":[[32,"choice","To do as the stranger says, and enter the box"],[14,"choice","To make a run for it along the street"]],"en":null,"s":"On an ordinary street, a stranger in a pinstriped suit hauls a writhing purple parasite out of a manhole and presses a silver torch into the protagonist's hands. The device fails, the creature swells into a huge many-armed monster, and the stranger urges entering the blue box or fleeing along the road.","w":459},"2":{"p":null,"e":[[37,"choice","To head for the patrol ship"],[24,"choice","to find cover"]],"en":null,"s":"A Shiner patrol moves on, and the Doctor proposes disrupting the fuel-cell loading to ground the freighter. The protagonist's antidote blasts three guards down before its charge expires, forcing a retreat, and the Doctor points toward a nearby patrol craft as a source of firepower.","w":156},"3":{"p":null,"e":[[38,"choice","to the lab's erit, under cover of the workstations"],[44,"choice","To keep watching from wherc you ane"]],"en":null,"s":"After riding a Zoob, the protagonist emerges in a laboratory where silver-eyed humanoids direct robotic loaders filling three white pods with canisters. The Doctor pulls them behind a cabinet, and an open doorway on the far side offers a route out while watching remains an option.","w":219},"4":{"p":null,"e":[[11,"choice","To dash for the Zoob"],[69,"choice","to hide"]],"en":null,"s":"Knocked unconscious while fighting a Shiner, the protagonist wakes pinned to a cold surface as a robotic arm lowers a tissue patch toward their chest. Blip topples the machine with a metal bar and guides them toward a Zoob, but approaching Shiners force a choice between fleeing and hiding.","w":180},"5":{"p":null,"e":[[81,"choice","To tell the stranger that you think he's lost his marbles"],[29,"choice","To head back outside through the doors"]],"en":null,"s":"Pulling both levers throws the console room into violent motion, and the stranger explains that the blue box has jumped more than two centuries. He identifies himself as the Doctor, a Time Lord, leaving the protagonist to decide whether to accept the story or step back outside.","w":192},"6":{"p":null,"e":[[63,"choice","To ambush the cosmobot group"],[25,"choice","to hitch a ride into the ship's interior"]],"en":null,"s":"A Zoob carries the pair into a vast hangar where the freighter Fat Lady loads white pods through open cargo doors. The Doctor proposes sabotaging the launch or disabling two cosmobots, offering a choice between ambushing the robots and riding a pod inside.","w":271},"7":{"p":null,"e":[[34,"choice","To take a swig"],[71,"choice","To say you're not thirsty, thanks"]],"en":null,"s":"Just as capture seems certain, a glowing Zoob opens and a white-haired boy beckons the pair through it into an empty storeroom. He leads them into a hidden floor den and offers a bottle of thick blue liquid, leaving them to accept or refuse the drink.","w":228},"8":{"p":null,"e":[[94,"choice","to what exactly the Skinthetic company does"],[60,"choice","To head for the corridor"]],"en":null,"s":"A jarring Zoob journey ends at a warehouse aisle lined with racking full of white containers marked with the Skinthetic logo. The Doctor reads labels for surgical supplies, and the protagonist can either search for more clues or head down the corridor at the far end.","w":162},"9":{"p":null,"e":[[55,"choice","To stand your ground"],[83,"choice","To run for your life"]],"en":null,"s":"Rounding a bend, the pair encounter the silver-eyed humanoid the Doctor earlier fooled, now checking his false ministry claim at a wall console. It declares them intruders who must be grafted, and the sound of many footsteps signals approaching reinforcements.","w":156},"10":{"p":null,"e":[[43,"choice","To do as the Doctor asks, and stay back"],[73,"choice","To have a go at piloting the second loader"]],"en":null,"s":"An antidote charge drops a Shiner, and the pair hide the body beside two towering robo-loaders built for heavy lifting. The Doctor seizes one machine to strike at the freighter and orders the protagonist to stay behind, though a second loader invites a riskier attempt.","w":175},"11":{"p":null,"e":[[23,"choice","To ask the Doctor what he's planning once you get there"],[77,"choice","To ask what the device he's carrying is"]],"en":null,"s":"In a communications room, Blip recovers an unsent warning from Professor Treffin that a shipment of fifty million patches must never reach Earth. The Doctor explains the patches are cloned alien parasites and resolves to halt the launch, then leads the way toward a Zoob bound for the hangar.","w":400},"12":{"p":null,"e":[],"en":null,"s":"Overwhelmed by armed Shiners, the pair retreat as the Fat Lady lifts off, and the Doctor seals a hatch behind them with his sonic screwdriver. He then reprograms an emergency escape pod into a missile, destroying the freighter and proposing a tour of twenty-third-century Earth.","w":420},"13":{"p":null,"e":[[9,"choice","To wait a few moments, then set off in the same direction as the humanoid"],[38,"choice","To head the opposite way"]],"en":null,"s":"The Doctor brandishes blank psychic paper and invents a viral-control ministry identity, warning that the protagonist carries a contagious retrovirus. The puzzled humanoid obediently departs for isolation equipment, and the pair must choose whether to follow its route or take the other way.","w":151},"14":{"p":null,"e":[[40,"choice","To pull the left-hand leYer"],[5,"choice","To hedge your bets, and pull both"]],"en":null,"s":"A tentacle drags the protagonist back toward the monster's maw until the pinstriped stranger hauls them free and into the blue box. Inside, he explains a time mine will soon displace everything alien nearby, then demands a reserve lever be pulled, though two identical levers are within reach.","w":282},"15":{"p":null,"e":[[79,"choice","To head for the hatch marked C2"],[27,"choice","To opt for the other one"]],"en":null,"s":"Thrown out of an airlock into open space, the protagonist discovers the suit helmet sustains them while the station recedes. The Doctor anchors a line to the hull, and after using a thruster to join him they are reeled back, leaving two airlock hatches reachable along the grab-rails.","w":216},"16":{"p":null,"e":[[52,"choice","To hide inside the recess"],[3,"choice","To escape by entering the Zoob"]],"en":null,"s":"Trying the neural interface triggers a failed biometric login, a blinding pulse, and station alarms that turn service drones into pursuers. The Doctor carries the unconscious protagonist clear, then hurries them toward a recess holding another Zoob as rapid footsteps approach.","w":252},"17":{"p":null,"e":[[57,"choice","To try the glowing opening"],[93,"choice","To explore this area further"]],"en":null,"s":"Stepping from the TARDIS, the pair find themselves in a circular silver room beside a trolley of canisters marked Skinthetic. A pocket encyclopedia reveals the company's headquarters is an orbital iso-sphere station, and the Doctor invites a look around either through a glowing opening or across the area.","w":283},"18":{"p":null,"e":[[24,"choice","to evade your pursuers"],[12,"choice","to attack them as they drop down after you"]],"en":null,"s":"Landing hard on the freighter's hull, the protagonist nearly slides off until the Doctor catches their wrist and uses his screwdriver to hold on. Shiners climb after them like spiders, so the pair slide down the far side to the hangar floor with pursuers still closing.","w":164},"19":{"p":null,"e":[[6,"choice","To take the left-hand Zoob"],[47,"choice","To take the one on the right"]],"en":null,"s":"Blip leads the protagonist to a small office where the terrified Professor Treffin hides, insisting the Second Skin project was a catastrophic error built on comet tissue. The Doctor demonstrates a limited-charge antidote, and the professor directs them to two Zoobs, one of which should reach the hangar.","w":380},"20":{"p":null,"e":[[16,"choice","To try on the visor"],[60,"choice","To choose one of the corridors"]],"en":null,"s":"A black console projects a miniature model of the iso-sphere station, with twelve apex units joined by tubular struts, and a slim visor rests beside it. The Doctor suspects the visor offers a mental guided tour but warns such early interfaces are unreliable, while three identical corridors offer another route.","w":157},"21":{"p":null,"e":[[92,"choice","if he agrees"],[46,"choice","To follow the conveyor out of the room"]],"en":null,"s":"Their diversion buys time, and a side room reveals a machine producing wafer-thin patient information chips for an anti-UV skin patch. The Doctor explains that Skinthetic grew tissue meant to shield humans from a ruined ozone layer, though the protagonist finds the concept unsettling.","w":221},"22":{"p":null,"e":[[13,"choice","To go along with whatever the Doctor has planned"],[83,"choice","to run for it"]],"en":null,"s":"Pleas fail as a silver-eyed attacker throttles the Doctor, who collapses after the sonic screwdriver slips from his hand. The protagonist snatches the device and jabs the assailant, reviving the Doctor just as another humanoid arrives and he proposes using psychic paper to confuse it.","w":217},"23":{"p":null,"e":[[58,"choice","to sneak on board"],[37,"choice","To head for the astro-tug"]],"en":null,"s":"Shiners rush in before any plan forms, and the Doctor's device drops four of them, which he explains will free the hosts once they wake. He hands over the limited-charge antidote and they enter a Zoob reaching the hangar, where a small astro-tug and the huge freighter suggest two ways to stop the launch.","w":297},"24":{"p":null,"e":[],"en":null,"s":"Blip's hover-cart rescues the pair, but a launch klaxon sends the hangar crew fleeing as the freighter's engines ignite. The Doctor sends the cart into an engine intake and destroys the ship, then rises from the debris proposing more antidote guns and a ride home for Blip.","w":416},"25":{"p":null,"e":[[85,"choice","To duck down again and ride the cargo pod into the Fat lady's hold"],[18,"choice","To evade the laser fire by leaping onto the outside of the ship's hull"]],"en":null,"s":"Laser fire rakes the cargo pod after the pair are spotted, and the Doctor's antidote drops three pursuers while more close in. Leaping across metre-wide gaps between floating pods, the protagonist nears the freighter's belly and must choose between riding inside or jumping to the hull.","w":166},"26":{"p":null,"e":[[7,"choice","to overpower them"],[38,"choice","To wait until they have moved off, then follow the corridor"]],"en":null,"s":"While the Doctor wrestles with a locked laboratory door, two armed silver-eyed figures emerge from a glowing Zoob and search the workstation aisles. They pass close to the hidden pair and leave through the main doorway, inviting either a surprise attack or a quieter follow.","w":161},"27":{"p":null,"e":[[55,"choice","to defend yourself"],[87,"choice","To dash for the Zoob"]],"en":null,"s":"After cycling through an airlock, the pair enter a cluttered maintenance bay filled with tools and a half-stripped vehicle. Two silver-eyed humanoids abandon their repair work and advance, leaving the protagonist to seize a wrench or run for the glowing Zoob.","w":160},"28":{"p":null,"e":[[24,"choice","To stand and fight"],[12,"choice","To duck under the Fat Lady's low belly and hurriedly retreat"]],"en":null,"s":"Feigning unconsciousness, the protagonist overhears guards mention a colonising plan and future grafting. The Doctor slides down the freighter's hull firing antidote charges, frees the captive, and faces a fresh wave of Shiners, forcing a choice between standing or slipping away.","w":153},"29":{"p":null,"e":[[8,"choice","To try the Zoob"],[67,"choice","To explore the helix layout map further"]],"en":null,"s":"The blue box now stands in a triangular room where a floating helix of twelve linked spheres serves as a station map. Touching it triggers a synthetic status report, and the Doctor explains that the glowing opening is a fast transit tube, offering either a ride or further study.","w":310},"30":{"p":null,"e":[[78,"choice","to resist"],[52,"choice","to avoid being treated roughly"]],"en":null,"s":"Exploring alone through an eerily quiet area, the protagonist is ambushed by a pair of silver-eyed figures. One is knocked sprawling, but the other seizes their neck and announces that this human will be prepared for grafting before the rest are hunted down.","w":153},"31":{"p":null,"e":[[50,"choice","To find cover, as Blip suggests"],[88,"choice","to help the Doctor"]],"en":null,"s":"The craft's front section blasts across the hangar and crumples against the far wall, leaving the protagonist dazed beside the smoking wreck. Blip has dragged them clear but could not reach the Doctor, and now urges finding shelter rather than attempting a rescue.","w":162},"32":{"p":null,"e":[[17,"choice","To lead the way out of the TARDIS doors"],[53,"choice","To let the Doctor go first"]],"en":null,"s":"Inside the cavernous console room, something called a Constrictorix clings to the outer hull until the Doctor throws the controls and makes a short time-space jump. He introduces himself properly, then invites the protagonist to step outside and discover their new location.","w":252},"33":{"p":null,"e":[[4,"choice","to help the Doctor"],[80,"choice","To quickly turn and re-enter the Zoob"]],"en":null,"s":"The Doctor strides confidently into the middle of three Zoobs, but the route leads straight back to the TARDIS, now surrounded by silver-eyed Shiners. Two of them seize him, and as he shouts a warning the protagonist must decide whether to help or escape.","w":151},"34":{"p":null,"e":[[30,"choice","to see what evidence you can find"],[91,"choice","together"]],"en":null,"s":"The blue drink proves pleasant, and the white-haired boy introduces himself as Blip, explaining that a skin condition led doctors to send him for a Second Skin graft. He describes testers turning silver-eyed and strange, and the Doctor resolves to investigate the project quickly.","w":272},"35":{"p":null,"e":[[55,"choice","to fight them off"],[7,"choice","to barge past one pair"]],"en":null,"s":"Crawling through a narrow duct, the pair crash through collapsing surface into a surgical theatre where a robotic arm fixes its lens on them and triggers an alarm. Two groups of silver-eyed figures converge from both corridor ends, forcing a choice between fighting and barging past.","w":158},"36":{"p":null,"e":[[59,"choice","to attack the lloctor's assailant"],[22,"choice","to mdc it dear that you both submit"]],"en":null,"s":"A lone figure with shimmering skin and blank silver eyes approaches, and when the Doctor offers a hand it seizes him by the throat. Knocked aside into a stack of canisters, the protagonist scrambles up and must choose between striking the assailant or signalling surrender.","w":218},"37":{"p":null,"e":[[61,"choice","To hit the button marked EMERGEiICY EIECT"],[31,"choice","To choose the ESCAPE POD button"]],"en":null,"s":"Inside the small craft, a failed biometric check pins the protagonist in a restraining harness while Shiners and drones converge outside. The Doctor restores the emergency systems and offers a choice between the eject control and the escape pod button.","w":188},"38":{"p":null,"e":[[51,"choice","To fly the scooter along the left-hand corridor"],[56,"choice","To try the other direction"]],"en":null,"s":"A deserted corridor leads to an alcove holding eight wheel-less air scooters, two of them charged and ready. The Doctor mounts one and invites the protagonist onto the second, then offers a choice of flying left or trying the opposite direction.","w":159},"39":{"p":null,"e":[[83,"choice","To sprint along the corridor the ryay you came"],[58,"choice","To flee in the other direction"]],"en":null,"s":"The Doctor poses as a prison officer and tries to send a silver-eyed guard to a briefing, but the creature repeats that all humans must be grafted. The protagonist tackles it, knocking its weapon loose, and the Doctor shouts to run, leaving two escape routes.","w":179},"40":{"p":null,"e":[[81,"choice","if you say so' !ook"],[29,"choice","To hurry for the doorrvay"]],"en":null,"s":"The floor shudders as the stranger pilots his craft, then announces that a miscalculation has placed them in orbit above Earth in the year 2225. Convinced he is unhinged, the protagonist wants only to go home and must choose between humouring him or heading for the doors.","w":188},"41":{"p":null,"e":[[11,"choice","to the Zoob"],[33,"choice","to the door and go after the Doctor"]],"en":null,"s":"Blip opens a cargo pod holding hundreds of silver canisters and withdraws a patch of skin-like tissue, just as the Doctor arrives and asks the pair to guard it. When three Shiners emerge from a Zoob, Blip begins crawling toward it, offering a chance to follow him or chase the Doctor.","w":168},"42":{"p":null,"e":[[36,"choice","To ask the Doctor what he thinks the device is for"],[16,"choice","To take a look through its viewfinder"]],"en":null,"s":"A Zoob deposits the protagonist in a room dominated by a transparent dome containing a dish of near-colourless tissue beneath a many-armed robotic instrument. A nearby console includes a viewfinder, inviting either questions about the machine's purpose or a direct look through its lens.","w":170},"43":{"p":null,"e":[[88,"choice","to divert the Shiners'attention"],[50,"choice","To lie low, as Blip suggests"]],"en":null,"s":"Laser fire brings the Doctor's robo-loader crashing down, and Shiners advance on the wreck while Blip appears beside the protagonist. The protagonist proposes drawing the guards away, but Blip favors waiting quietly until a safer chance to help arises.","w":161},"44":{"p":null,"e":[[26,"choice","to crack the door lock"],[72,"choice","To suggest that you escape via the ventilation duct"]],"en":null,"s":"From hiding, the pair watch the humanoids finish loading the floating pods and leave, after which the laboratory doors seal behind them. The Doctor finds the lock crypto-protected and no other exit except a ceiling grille, prompting a choice between buying time and trying the duct.","w":163},"45":{"p":null,"e":[[12,"choice","To iump down at the last minute and engage them"],[25,"choice","to be better hidden"]],"en":null,"s":"Racing along the anti-gravity conveyor toward the freighter's hold, the pair see another Shiner group ahead and leap into the gap between moving pods. Riding the invisible force field, they must decide whether to drop down fighting or climb onto a pod for better concealment.","w":156},"46":{"p":null,"e":[[30,"choice","to see what evidence you can find"],[91,"choice","together"]],"en":null,"s":"A sneeze reveals a pale, white-haired boy hiding in the room, who introduces himself as Blip and asks whether the pair are Shiners. He explains that graft testers turned shimmering and silver-eyed, and the Doctor decides they must learn more about the Second Skin project.","w":232},"47":{"p":null,"e":[[76,"choice","to sabotage the loading system"],[25,"choice","to the main doors"]],"en":null,"s":"The right-hand Zoob opens onto a platform above the hangar, where massive doors reveal space and the freighter Fat Lady receives a stream of floating cargo pods. The Doctor suggests jamming the launch doors or sabotaging the loading system before the ship can depart.","w":231},"48":{"p":null,"e":[[87,"choice","To dash for the Zoob entrance"],[91,"choice","to create a delay"]],"en":null,"s":"Following the left-hand duct, the pair drop into a narrow aisle of white food cabinets whose keypads dispense foil-wrapped meal cubes. Two silver-eyed figures appear at the far doorway, leaving a dash for the mid-aisle Zoob or a toppled dispenser as possible responses.","w":181},"49":{"p":null,"e":[[94,"choice","to wherc the TARDIS has brought you"],[16,"choice","To obey the device"]],"en":null,"s":"A first Zoob trip leaves the protagonist queasy, and the Doctor explains that these tubes move travellers along fixed routes at enormous speed. A small black sphere then blocks the passage, announcing a recorded access area and demanding a palm print, so the pair can comply or walk past it into the chamber.","w":201},"50":{"p":null,"e":[],"en":null,"s":"From hiding, the pair watch the freighter lift off and Blip lose hope, until the Doctor reappears with a cable and a plan to alter the ship's guidance beam. He drifts across open space to the gantry, retunes the transmitter, and is hauled back, sending the vessel toward a saltwater grave.","w":471},"51":{"p":null,"e":[[7,"choice","to get your scooter airborne again"],[55,"choice","to the advancing humanoids"]],"en":null,"s":"The scooters carry them into a vast chamber housing a glowing reactor, where a red bolt strikes the Doctor's vehicle and sends both riders crashing to the floor. Laser-armed humanoids close in, leaving the protagonist to restart a scooter or face them on foot.","w":161},"52":{"p":null,"e":[[19,"choice","To follow Blip"],[64,"choice","To try the other direction"]],"en":null,"s":"Cooperating with the Shiners earns the protagonist a small cell sealed by bars of blue light, with imprisonment promised until a grafting theatre is ready. Blip later releases them and announces he has obtained a patch, then chooses a corridor direction for the search.","w":158},"53":{"p":null,"e":[[93,"choice","To explore your surnoundings further"],[57,"choice","To try the glowing opening"]],"en":null,"s":"A security drone fires as the pair emerge from the TARDIS, but the Doctor's sonic screwdriver stops it and switches it to a hospitality setting. The machine welcomes them to the Skinthetic iso-sphere headquarters and describes the twelve linked apex units before scuttling away.","w":312},"54":{"p":null,"e":[[82,"choice","to your feet"],[28,"choice","to stil! be unconscious"]],"en":null,"s":"A laser blast throws the protagonist into darkness, and they wake shackled beneath the freighter's enormous belly with two shimmering-skinned captors standing nearby. The Doctor is absent, and the protagonist must either rise openly or keep pretending to be unconscious.","w":148},"55":{"p":null,"e":[[34,"choice","To accept his offer of food"],[71,"choice","To politely decline"]],"en":null,"s":"As humanoids close in, a scruffy boy appears with a homemade device, hurls a slime grenade, and guides the pair through a concealed wall panel into a cramped den. He explains the weapon harms nobody and offers a block of blue food, which can be accepted or refused.","w":178},"56":{"p":null,"e":[[21,"choice","to delay them"],[87,"choice","To make straight for the Zoob"]],"en":null,"s":"The protagonist quickly learns to fly the scooter, but a luminous bolt announces three pursuers riding similar machines. The Doctor dives into a side corridor that proves a dead end with a Zoob, and they dismount as their attackers round the corner firing.","w":162},"57":{"p":null,"e":[[89,"choice","to recover from your Zoob ride"],[20,"choice","To push on with erploring the area it has taken you to"]],"en":null,"s":"Another violent tube journey ends in unfamiliar territory, where the Doctor cheerfully explains how the Zoom Tubes link the station's apexes. Noticing the protagonist's queasy expression, he suggests blocking the ears and offers a moment to recover or further exploration.","w":164},"58":{"p":null,"e":[[72,"choice","to reach the ceiling grille"],[21,"choice","To overturn one of the trailers, so the spilt canisters block the corridor"]],"en":null,"s":"Running from a persistent pursuer, the pair come upon an unattended baggage vehicle whose trailers are stacked with canisters, with a ceiling grille directly above. The Doctor proposes hiding in the duct, though approaching footsteps make either climbing up or tipping a trailer seem urgent.","w":159},"59":{"p":null,"e":[[83,"choice","To run for it"],[13,"choice","To bluff your way out of your predicament"]],"en":null,"s":"The protagonist's blow breaks the chokehold, but the recovered assailant draws a weapon and the Doctor deflects its bolt back with his screwdriver. A second silver-eyed figure arrives, and the Doctor offers a choice between fleeing and attempting a bluff with his blank psychic paper.","w":235},"60":{"p":null,"e":[[22,"choice","to prevent it harming the Doctor"],[59,"choice","To shoulder charge it"]],"en":null,"s":"Automatic doors reveal a motionless man whose exposed skin shimmers faintly, and the Doctor's scan detects hibernation-level readings and non-human signals. The figure's eyes open as blank silver, and it seizes the Doctor by the throat, prompting either reasoning or a physical charge.","w":228},"61":{"p":null,"e":[[50,"choice","To do as Blip suggests"],[88,"choice","to the Doctor's aid"]],"en":null,"s":"Pressing the eject control launches the seat through the cabin roof and over the freighter, with mini-thrusters softening the landing. Blip frees the protagonist and reports that the Doctor came down among Shiners, urging concealment while the alternative is rushing to help.","w":159},"62":{"p":null,"e":[[39,"choice","To go along with whatever bluff the Doctor has up his sleeve"],[72,"choice","To climb up into the service void above the corridor"]],"en":null,"s":"Hidden observers watch a silver-eyed leader order every tube in the sector shut down and the intruders dragged to a grafting theatre. The remaining figure kills the nearby Zoob, and the Doctor weighs a psychic-paper bluff against climbing into the service void overhead.","w":251},"63":{"p":null,"e":[[45,"choice","To dash for the Fat lady's hold"],[37,"choice","To head for the maintenance craft"]],"en":null,"s":"The pair charge the cosmobot escort, the protagonist's charge fells one Shiner, and the Doctor deflects laser bolts with his screwdriver. When the robots prove armed and the fire becomes overwhelming, he proposes either reaching the freighter's hold or using a maintenance tug to block the launch doors.","w":182},"64":{"p":null,"e":[[77,"choice","To ask what the device is"],[23,"choice","To ask what the plan is once you reach the hangar"]],"en":null,"s":"Searching the station, the protagonist finds the Doctor studying an encrypted archive that traces the patches to comet-ice tissue he identifies as hibernating parasites. He seizes a device and warns that fifty million clones are already loading aboard a freighter, then invites questions about the weapon or his plan.","w":345},"65":{"p":null,"e":[[19,"choice","To follow him"],[30,"choice","To follow the corridor in the other direction"]],"en":null,"s":"While Blip searches the system, two Shiners emerge from a Zoob and discuss starting the first colonising wave and ordering the loading procedure. The pair slip out unnoticed, and Blip urges finding the Doctor before splitting off down one corridor.","w":158},"66":{"p":null,"e":[[12,"choice","To take on the Shiner patrol"],[54,"choice","To make a dash for the turntable control console, beside the hangar doors"]],"en":null,"s":"Hidden behind containers on the hangar floor, the pair watch the freighter rotate toward the open doors and identify the turntable console that controls the alignment. A Shiner patrol moves their way, forcing a choice between confronting it and racing for the console.","w":155},"67":{"p":null,"e":[[16,"choice","To place your hands onto the control column, as instructed"],[35,"choice","to do so"]],"en":null,"s":"Touching the model again turns the highlighted tube green and raises a waist-high control column from the plinth. A synthetic voice invites interaction to change that tube's settings, and two warm, palm-shaped panels glow on the column's surface.","w":143},"68":{"p":null,"e":[[10,"choice","To pick off the guard with a shot from the antidote device"],[2,"choice","To stay hidden"]],"en":null,"s":"Creeping between equipment stacks, the pair watch Shiners deliver a dozen fuel cells toward the freighter, which the Doctor says will complete her preparations. A guard near the open access hatch turns toward their hiding place, offering a choice between shooting it and remaining concealed.","w":147},"69":{"p":null,"e":[[6,"choice","To take the left-hand Zoob"],[47,"choice","To take the right-hand one"]],"en":null,"s":"When Blip's plea fails, the Shiners boast of controlling human bodies and shipping patches to colonise Earth, until the Doctor stuns them with an antidote burst. He explains the parasitic skin, then follows Blip to two tubes serving the Leo and Pisces hangars, each offering a different route.","w":382},"70":{"p":null,"e":[[60,"choice","To investigate the corridor"],[94,"choice","To search for an alternative exit"]],"en":null,"s":"The first tube ride ends in a clinical ward of empty beds fitted with small display screens, where the Doctor reads a trial record describing a successful graft. Activity from the single corridor interrupts him, leaving a choice between investigating the noise and seeking another way out.","w":162},"71":{"p":null,"e":[[33,"choice","To go with the Doctor"],[75,"choice","To go with Blip"]],"en":null,"s":"After the food is refused, the boy introduces himself as Blip and explains that ozone loss drove Skinthetic to create protective artificial skin. He describes testers becoming silver-eyed Shiners, and the Doctor asks him to obtain a patch so they can run tests.","w":211},"72":{"p":null,"e":[[48,"choice","To craw! along the left-hand duct"],[35,"choice","To branch right"]],"en":null,"s":"The Doctor opens a ceiling grille and the pair crawl into a cramped service duct, where a shaft of light reveals an operating room below. Four restrained men with ordinary skin lie on tables as a robotic arm applies a patch, and the duct soon splits in two directions.","w":168},"73":{"p":null,"e":[[12,"choice","To stand and fight"],[74,"choice","To hastily retreat"]],"en":null,"s":"Mounting the second robo-loader, the protagonist lands a heavy mechanical punch on a Shiner before laser fire severs the Doctor's machine's legs. The falling loader knocks their own machine down, and surviving Shiners advance on the pair as they struggle free.","w":161},"74":{"p":null,"e":[[27,"choice","To try the left-hand hatch"],[79,"choice","To try the one on the right"]],"en":null,"s":"The chamber suddenly empties into space, and the protagonist finds no air inside their helmet while drifting away from the station. The Doctor propels himself over, fixes a cylinder to the helmet valve, then steers them both to a hull grab-rail near two access hatches.","w":197},"75":{"p":null,"e":[[30,"choice","To explore the corridor"],[41,"choice","To stay with Blip"]],"en":null,"s":"Blip takes the protagonist to the patch-growing laboratory, where empty incubators and a locked white cargo pod suggest the stock has already been packed. While Blip works on the lock, a door at the far side opens onto a narrow corridor that might lead to more patches.","w":163},"76":{"p":null,"e":[[25,"choice","To escape by iumping down onto one of the cargo pods floating below the monorail"],[66,"choice","to the hangar floor"]],"en":null,"s":"The pair drop from the platform onto a service gantry beneath the pod monorail, where the Doctor's screwdriver sparks uselessly against a shielded panel. Footsteps above reveal a patrolling Shiner, forcing a choice between jumping onto a passing pod and slipping along the gantry to a ladder.","w":167},"77":{"p":null,"e":[[10,"choice","To use your antidote gun"],[84,"choice","To duck behind the nearby stack of containers"]],"en":null,"s":"The Doctor explains that his modified bolt-gun fires neurotoxin darts which disable the alien tissue and leave the human host unconscious, then hands over the weapon with only six charges. After a Zoob ride to the hangar, a patrolling Shiner approaches as the launch doors begin to open.","w":273},"78":{"p":null,"e":[[11,"choice","to reach the Zoob unnoticedr"],[69,"choice","To stay hidden"]],"en":null,"s":"The protagonist drives an elbow into their captor, and Blip charges the second Shiner, letting both fugitives flee into a machinery-filled processing plant. Hidden behind a boiler as their pursuers search, they spot a glowing Zoob and must choose between reaching it or remaining concealed.","w":165},"79":{"p":null,"e":[[7,"choice","to continue holding offyour attackers with the thruster"],[87,"choice","To make a break for the Zoob while they recover"]],"en":null,"s":"After passing through an airlock, the pair emerge beside a huge transparent reactor dome just as three silver-eyed figures arrive through a Zoob. The Doctor's handheld thruster blasts all three backwards, leaving the choice of pressing the advantage or escaping through the tube.","w":185},"80":{"p":null,"e":[[64,"choice","to search both corridors"],[19,"choice","together"]],"en":null,"s":"Reeling from a third tube journey, the protagonist is relieved when Blip rather than a Shiner follows, and he suggests the Doctor may have escaped or been taken to the grafting theatres. At a junction he cannot recall the correct corridor, so they can separate to search or remain together.","w":171},"81":{"p":null,"e":[[49,"choice","To follow the Doctor into the peculiar opening"],[86,"choice","to return"]],"en":null,"s":"The Doctor flings open the doors to reveal the TARDIS floating inside a transparent observation lounge, with a double-ringed station visible outside. A circular opening filled with orange light draws him through it, and he vanishes, leaving the protagonist to follow or wait.","w":234},"82":{"p":null,"e":[[50,"choice","To lie low for a while, as Blip suggests"],[88,"choice","to the doctor's aid"]],"en":null,"s":"A whisper reveals Blip hidden beneath the freighter, working a metal rod against the protagonist's wrist restraints until their hands come free. They slip away under the hull, but the far side is equally busy, and Blip proposes hiding in an unattended hover-cart.","w":162},"83":{"p":null,"e":[[15,"choice","To take the gadget in the Doctor's left hand first"],[74,"choice","To grab the one in his right'hand"]],"en":null,"s":"A fleeing pair reach sealed doors that the Doctor opens just in time, and their pursuer slams into them after they dive through. The chamber beyond is an airlock with helmets and handheld gadgets, and a decompression warning forces a hurried choice between two devices.","w":193},"84":{"p":null,"e":[[90,"choice","To do as the Doctor says"],[54,"choice","To insist on going with him"]],"en":null,"s":"A patrolling Shiner stops beside the container but eventually moves on, letting the Doctor point out the motor unit above the half-open launch doors. He plans to climb a service gantry and disable it, ordering the protagonist to remain behind rather than accompany him.","w":168},"85":{"p":null,"e":[[50,"choice","to lie loq"],[88,"choice","to the Doctor's aid"]],"en":null,"s":"A giant robo-loader's mechanical hand plucks the protagonist from the pod and carries them away, until Blip hurls a metal bar into the drone operator and the machine explodes. Dropped to the floor, the protagonist is urged to flee but still thinks of rescuing the Doctor.","w":193},"86":{"p":null,"e":[[36,"choice","To ask the Doctor where he thinks everybody is"],[60,"choice","if you have mone Iuck exploring via the corridor"]],"en":null,"s":"The Doctor returns from the glowing opening with his eyes tightly shut, explaining that keeping them closed reduces the unsettling effects of tube travel. He reports arriving at an empty waste-processing site called Taurus Apex, then offers either discussion or a corridor search.","w":163},"87":{"p":null,"e":[[92,"choice","To ask the Doctor what he thinks about the Second Skin idea"],[46,"choice","To exit the auditorium"]],"en":null,"s":"An empty auditorium comes alive with a holographic sales presentation describing how Second Skin patches shield wearers from ultraviolet radiation after ozone loss. The Doctor silences the recording with his screwdriver, leaving the protagonist to ask his view or leave the room.","w":218},"88":{"p":null,"e":[],"en":null,"s":"A klaxon empties the hangar, and the pair shelter behind a dented hull section as the freighter's engines ignite and the Doctor walks clear inside a protective bubble. He reveals he sabotaged the coolant system so the ship will burn up on re-entry, then proposes arming them to cure the remaining Shiners.","w":446},"89":{"p":null,"e":[[94,"choice","To search the warehouse area for edible supplies"],[36,"choice","To ask the Doctor what he thinks all the'nutrient gel' is for"]],"en":null,"s":"A tube ride delivers the pair to an enormous warehouse whose endless racks hold medical supplies, filters, gloves and drums of nutrient gel. The word nutrient and the Doctor's talk of biscuits make the hungry protagonist consider hunting for food instead of asking about the gel.","w":153},"90":{"p":null,"e":[[24,"choice","To run for it"],[10,"choice","To try another shot with the antidote device"]],"en":null,"s":"A laser bolt stops the Doctor short as he heads for the ladder, and the protagonist takes a long shot with the antidote device that strikes the Shiner's arm. The guard falls, but a second one advances, and the protagonist must decide whether to flee or fire again.","w":162},"91":{"p":null,"e":[[55,"choice","To stay with Blip"],[33,"choice","To go with the Doctor"]],"en":null,"s":"Blip leads the way through a tube interchange to the station's operations centre, where he starts searching for where patches are stored. The Doctor spots the TARDIS on a surveillance screen and leaves to fetch diagnostic equipment, offering a choice between assisting Blip or accompanying him.","w":166},"92":{"p":null,"e":[[11,"choice","To go with the Doctor"],[52,"choice","To help BIip track down a patch"]],"en":null,"s":"A pale, white-haired boy interrupts to call the project a nightmare, explaining that his pigment deficiency made him a proposed test subject before he ran away. He describes testers turning shimmering and silver-eyed, introduces himself as Blip, and is asked to obtain a patch while the Doctor fetches diagnostic equipment.","w":243},"93":{"p":null,"e":[[70,"choice","To choose the Zoob that the Doctor has just activated"],[42,"choice","To try the original one"]],"en":null,"s":"Palm-print panels line the wall, and the Doctor's touch opens a doorway of light labelled for transit to Scorpio Apex. He explains that tube travellers should keep their eyes shut and asks whether to use the newly opened route or the original one.","w":172},"94":{"p":null,"e":[[62,"choice","to hide"],[3,"choice","To dash for a second Zoob opening you've spotted nearby"]],"en":null,"s":"An alarm summons a parade of reprogrammed service drones, and the Doctor throws his screwdriver into a ceiling light, triggering a chain of explosions. Falling debris crushes the machines, but more humanoids emerge from the tube, prompting a choice between hiding and running for another opening.","w":346}},"zh_ui_url":"../../assets/reader-zh.js?v=0e2b2b28"};
+
+</script>
+<script>
+/* AS Gamebook Reader - per-book reader runtime (shared template).
+ * Data: window.BOOK_DATA (slug, meta, structure + AI summaries), and
+ * optionally window.TEXT_PACK (full build) or a text pack stored in
+ * localStorage. All book-specific identity comes from BOOK_DATA; this file
+ * contains no hard-coded book names. Player-facing strings are English by
+ * default; a pack carrying "ui_locale": "zh" switches the whole UI to
+ * Chinese (see I18N / applyLocale).
+ *
+ * Two host modes:
+ *  - Standalone book package (skeleton/full HTML): BOOK_DATA is embedded in
+ *    the page; on DOMContentLoaded the reader mounts itself.
+ *  - Multi-book entry (as-gamebook-reader.html): the shelf calls
+ *    ASReader.mount(rootEl, bookData, textPack, hooks) when a book is opened
+ *    and ASReader.unmount(rootEl) when returning to the shelf. No globals
+ *    from one mounted book leak into the next.
+ */
+(function () {
+  "use strict";
+
+  function startReader(opts) {
+    // opts: { root, DATA, inlinePackSections (null unless full build),
+  var DATA = opts.DATA;
+  var ROOT = opts.root || document;
+  var HOOKS = opts.hooks || {};
+  var SLUG = DATA.slug;
+  var PACK_KIND = DATA.pack_kind || (SLUG + "_text_pack");
+  var SECTIONS = DATA.sections;
+  var TOTAL = DATA.count;
+  var TOTAL_WORDS = DATA.total_words || 0;
+  var START = DATA.start;
+  var ICON = DATA.icon;
+  var META = DATA.meta || {};
+
+  // Number of terminal sections (out-degree 0); used for the "all endings
+  // found" denominator only, which stays hidden until every one is reached.
+  var ENDING_TOTAL = (function () {
+    var n = 0;
+    Object.keys(SECTIONS).forEach(function (k) {
+      if (!SECTIONS[k].e.length) n++;
+    });
+    return n;
+  })();
+
+  var SAVE_KEY = SLUG + ".save.v1";
+  var PACK_KEY = SLUG + ".textpack.v1";
+  // Route map progress: a per-book list of every visited section number.
+  // roadmap.html reads the same key, so the map reveals only what was read.
+  var PROGRESS_KEY = "agb.progress.v1." + SLUG;
+  // Public book pages publish a roadmap beside index.html. Hosts without a
+  // map (private multi-book entry) leave this empty and hide the top-bar
+  // button instead of linking nowhere.
+  var ROADMAP_URL = DATA.roadmap_url || null;
+  var SAVE_EXPORT_NAME = SLUG + "_save.json";
+  var SAVE_VERSION = 2;
+
+  // ---------------- state ----------------
+  // stack: the current play line, stack[stack.length-1] is the current section.
+  // read: set of every section ever lit up (monotonic, survives new play lines).
+  // endings: sections reached that are terminals.
+  var state = null;
+  var mode = "summary";          // "summary" | "original"
+  var inlinePackSections = opts.inlinePackSections || null;
+  var textPack = inlinePackSections;
+  var inlinePack = !!textPack;
+  var pretendDate = null;        // null | "weekday" | "weekend" (session only)
+  var rollTimer = null;
+
+  // ---------------- UI localisation -------------------------------------
+  // English by default. A text pack may carry "ui_locale": "zh"; applyPack
+  // then switches every reader-generated string and the static template
+  // labels to Chinese. Packs without the field behave exactly as before.
+  var I18N = {
+    en: {
+      saveWriteFail: "Could not write the save (browser storage blocked).",
+      pctRead: "{pct}% read",
+      noteBuiltin: "Built-in full edition (private).",
+      notePack: "Original text pack loaded on this browser.",
+      noteSkeleton: "Skeleton edition: AI summaries only.",
+      noteProgress: " Progress saves automatically in this browser.",
+      endingsFound: "Endings found: {n}",
+      endingsAll: "Endings found: {n} / {total} \u2014 all found",
+      tbSection: "Section", tbRead: "Read",
+      tbSummary: "Summary", tbOriginal: "Original", tbShelf: "Shelf",
+      endDeath: "The End &mdash; Death",
+      endBad: "Bad Ending",
+      endNeutral: "The End",
+      endGood: "Good Ending &mdash; Mission Complete",
+      endRead: "{pct}% of the book read",
+      continueWord: "Continue",
+      puzzleDone: "I've worked out the number",
+      weekday: "weekday", weekend: "weekend",
+      dateReal: "Today is a <strong>{day}</strong>. ",
+      datePretend: "Today is a <s>{real}</s> &mdash; you are pretending it is a <strong>{fake}</strong>. ",
+      dateUseReal: "Use today's real date ({day})",
+      datePretendLink: "I'm pretending I'm reading on a {day}",
+      diceRoll: "Roll the dice",
+      diceResult: "You rolled a {n}.",
+      diceLucky: " Lucky 6!",
+      goTo: "{label} \u2014 go to {sec}",
+      coinToss: "Toss the coin",
+      heads: "Heads", tails: "Tails",
+      headsUp: "HEADS", tailsUp: "TAILS",
+      manualDivider: "Or decide the outcome yourself:",
+      statusBuiltin: "This is the built-in full edition: every section's original text is included. (Private build \u2014 do not share.)",
+      statusLoadedEn: "Loaded text pack: {book} ({n} sections, English).",
+      statusLoadedZh: "Loaded text pack: {book} ({n} sections, Chinese).",
+      statusNone: "No original text pack loaded. The skeleton plays with AI summaries only.",
+      entryStatusNone: "No original text pack imported for this book yet. Import the text pack from the book's menu on the shelf.",
+      noSave: "No save to export yet.",
+      saveImported: "Save imported. Continuing at section {sec}.",
+      saveBad: "That file is not a valid save for this book.",
+      packLoaded: "Text pack loaded ({n} sections).",
+      packBad: "That file is not a valid original text pack for this book.",
+      packUiMissing: "Could not load the Chinese interface. Check your connection and try again.",
+      clearConfirm: "Clear ALL reading progress in this browser? This cannot be undone.",
+      clearDone: "All progress cleared.",
+      gamebook: "Gamebook",
+      kicker: "Interactive Gamebook",
+      homeShelf: "Shelf", homeTitle: "Title",
+      homeShelfTip: "Back to the shelf",
+      homeTitleTip: "Back to the title screen",
+      restartFrom: "Restart from {sec}",
+      startNew: "Start New",
+      settingsWord: "Settings",
+      undoWord: "Undo",
+      undoTip: "Undo the last move on this play line",
+      sectionWord: "Section",
+      origTip: "Import the original text pack to enable this",
+      routeMapTip: "Open this book's route map",
+      routeMapWord: "Route map",
+      moreTip: "More top bar items",
+      moreWord: "More",
+      progressTip: "Share of the book you have read",
+      endingsTip: "Different endings you have reached",
+      backToShelf: "&larr; Back to the shelf",
+      fullRouteMap: "Full route map &middot; full spoilers",
+      fontSizeTitle: "Reading font size",
+      fontDecAria: "Decrease font size",
+      fontIncAria: "Increase font size",
+      fontInputAria: "Reading font size in pixels",
+      resetWord: "Reset",
+      fontSizeNote: "Applies to every book on this device. The reading text uses relative sizing, so 16\u00a0px is the default.",
+      tbItemsTitle: "Persistent top bar items",
+      tbItemsNote: "Untick an item to move it into the top bar\u2019s \u201cMore\u201d menu. Changes apply immediately and are remembered.",
+      tbcheckSection: "Section number",
+      tbcheckProgress: "Reading progress & bar",
+      tbcheckEndings: "Endings found counter",
+      tbcheckMode: "Summary / Original switch",
+      tbcheckHome: "Shelf / Title button",
+      readingModeTitle: "Reading mode",
+      readingModeAria: "Reading mode",
+      readingModeNote: "Switch between Summary and Original any time using the segmented control in the top bar while reading.",
+      loadPack: "Load text pack\u2026",
+      removePack: "Remove text pack",
+      removePackConfirm: "Remove the loaded text pack from this browser? The reader returns to the skeleton (AI summaries) and the interface switches back to English.",
+      resetEverything: "Reset everything (progress & loaded pack)",
+      resetEverythingConfirm: "Remove the loaded text pack AND clear all reading progress for this book in this browser? This cannot be undone.",
+      saveTitle: "Save",
+      saveNote: "Progress is saved automatically in this browser, one save slot.",
+      exportSave: "Export save\u2026",
+      importSave: "Import save\u2026",
+      clearProgress: "Clear all progress",
+      closeWord: "Close",
+      jumpbackTitle: "Return to\u2026",
+      jumpbackNote: "More than one section you have visited can lead here \u2014 choose which one to step back to.",
+      cancelWord: "Cancel"
+    }
+  };
+  var uiLocale = "en";
+  // Chinese UI strings live in reader_zh.js and are fetched only when a pack
+  // actually switches the interface to Chinese. This keeps every English
+  // reading page free of Chinese text.
+  var zhI18nState = "idle"; // idle | loading | ready | failed
+  var zhI18nWaiters = [];
+  var ZH_UI_URL = DATA.zh_ui_url || "reader-zh.js";
+
+  function loadZhI18n(done) {
+    if (zhI18nState === "ready") { done(true); return; }
+    if (zhI18nState === "failed") { done(false); return; }
+    zhI18nWaiters.push(done);
+    if (zhI18nState === "loading") return;
+    zhI18nState = "loading";
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = ZH_UI_URL;
+    s.onload = function () {
+      if (window.ASGR_I18N_ZH) {
+        I18N.zh = window.ASGR_I18N_ZH;
+        zhI18nState = "ready";
+      } else {
+        zhI18nState = "failed";
+      }
+      var waiters = zhI18nWaiters; zhI18nWaiters = [];
+      waiters.forEach(function (fn) { fn(zhI18nState === "ready"); });
+    };
+    s.onerror = function () {
+      zhI18nState = "failed";
+      var waiters = zhI18nWaiters; zhI18nWaiters = [];
+      waiters.forEach(function (fn) { fn(false); });
+    };
+    document.head.appendChild(s);
+  }
+
+  function ensureLocale(locale, done) {
+    if (locale !== "zh") { done(true); return; }
+    loadZhI18n(function (ok) {
+      if (!ok) uiLocale = "en";
+      done(ok);
+    });
+  }
+
+  // null | { book, sections, locale, builtIn }
+  var packInfo = null;
+  function t(key, vars) {
+    var dict = I18N[uiLocale];
+    var s = (dict && dict[key] != null) ? dict[key] : I18N.en[key];
+    if (s == null) return key;
+    if (vars) {
+      Object.keys(vars).forEach(function (k) {
+        s = String(s).split("{" + k + "}").join(vars[k]);
+      });
+    }
+    return s;
+  }
+
+  // ---------------- global reader settings (shared across all books) ----
+  // Stored under one tool-wide key: reading font size in px (applied to
+  // :root, scales the rem layout) and which chapter top-bar items stay
+  // persistent (unticked ones move into the "More" overflow menu).
+  var SETTINGS_KEY = "asgr.settings.v1";
+  var TB_KEYS = ["section", "progress", "endings", "mode", "home"];
+  var DEFAULT_SETTINGS = {
+    fontPx: 16,
+    tb: { section: true, progress: true, endings: true, mode: true, home: true }
+  };
+  var gSettings = loadGlobalSettings();
+
+  function loadGlobalSettings() {
+    var s;
+    try {
+      s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+    } catch (e) { s = {}; }
+    var font = parseInt(s.fontPx, 10);
+    if (!(font >= 12 && font <= 32)) font = 16;
+    var tb = {};
+    TB_KEYS.forEach(function (k) { tb[k] = s.tb && s.tb[k] === false ? false : true; });
+    return { fontPx: font, tb: tb };
+  }
+  function saveGlobalSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(gSettings)); }
+    catch (e) { /* storage blocked: apply for this session only */ }
+  }
+  function applyFontSize() {
+    document.documentElement.style.fontSize = gSettings.fontPx + "px";
+    var input = $("font-size-input");
+    if (input) input.value = gSettings.fontPx;
+  }
+
+  // ---------------- tiny helpers ----------------
+  // querySelector works on both Document (standalone package) and an Element
+  // container (multi-book entry mount); getElementById is Document-only.
+  function $(id) { return ROOT.querySelector("#" + id); }
+  function pad3(n) { return (n < 10 ? "00" : n < 100 ? "0" : "") + n; }
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function todayKind() {
+    var d = new Date().getDay();
+    return (d === 0 || d === 6) ? "weekend" : "weekday";
+  }
+  function packAvailable() { return !!textPack; }
+
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(function () { t.hidden = true; }, 2600);
+  }
+
+  // ---------------- persistence ----------------
+  function persist() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({
+        v: SAVE_VERSION,
+        cur: state.cur,
+        stack: state.stack,
+        read: Object.keys(state.read).map(Number),
+        endings: state.endings,
+        firstArrival: state.firstArrival || {},
+        jumps: state.jumps || []
+      }));
+    } catch (e) {
+      toast(t("saveWriteFail"));
+    }
+    writeProgress();
+  }
+
+  // Union the live read set with the history already stored for this book,
+  // keeping every visited section (nothing is trimmed) and putting the
+  // current section last: roadmap.html treats that last entry as "you are
+  // here" and reveals only its one-hop neighbours.
+  function writeProgress() {
+    var history = [];
+    var seen = {};
+    function keep(n) {
+      n = Number(n);
+      if (!SECTIONS.hasOwnProperty(String(n))) return;
+      if (seen[n]) return;
+      seen[n] = true;
+      history.push(n);
+    }
+    try {
+      var raw = localStorage.getItem(PROGRESS_KEY);
+      var stored = raw ? JSON.parse(raw) : [];
+      (Array.isArray(stored) ? stored : []).forEach(keep);
+    } catch (e) { /* ignore malformed history */ }
+    Object.keys(state.read).forEach(keep);
+    var cur = Number(state.cur);
+    var idx = history.indexOf(cur);
+    if (idx >= 0) history.splice(idx, 1);
+    if (SECTIONS.hasOwnProperty(String(cur))) history.push(cur);
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(history)); }
+    catch (e) { /* storage blocked: reading still works */ }
+  }
+
+  // Carry the stored history to the map as a URL fallback, in the same order
+  // (current section last). The map also reads PROGRESS_KEY directly.
+  function roadmapUrl() {
+    var history = [];
+    var seen = {};
+    function keep(n) {
+      n = Number(n);
+      if (!SECTIONS.hasOwnProperty(String(n))) return;
+      if (seen[n]) return;
+      seen[n] = true;
+      history.push(n);
+    }
+    try {
+      var raw = localStorage.getItem(PROGRESS_KEY);
+      var stored = raw ? JSON.parse(raw) : [];
+      (Array.isArray(stored) ? stored : []).forEach(keep);
+    } catch (e) { /* ignore */ }
+    Object.keys(state.read).forEach(keep);
+    var cur = Number(state.cur);
+    var idx = history.indexOf(cur);
+    if (idx >= 0) history.splice(idx, 1);
+    if (SECTIONS.hasOwnProperty(String(cur))) history.push(cur);
+    return ROADMAP_URL + "?visited=" + history.join(",");
+  }
+
+  function openRouteMap() {
+    if (!ROADMAP_URL) return;
+    window.location.href = roadmapUrl();
+  }
+
+  function loadSave() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (!obj || (obj.v !== 1 && obj.v !== SAVE_VERSION) ||
+          typeof obj.cur !== "number")
+        return null;
+      var read = {};
+      (obj.read || []).forEach(function (n) {
+        if (SECTIONS.hasOwnProperty(String(n))) read[n] = true;
+      });
+      if (!SECTIONS.hasOwnProperty(String(obj.cur))) return null;
+      var stack = (obj.stack || [obj.cur]).filter(function (n) {
+        return SECTIONS.hasOwnProperty(String(n));
+      });
+      if (!stack.length) stack = [obj.cur];
+      // firstArrival was introduced in v2. A v1 save has no parent data;
+      // its already-lit sections render at depth 0 (no edges) until new
+      // moves attach descendants. See sanitizeFirstArrival.
+      var firstArrival = sanitizeFirstArrival(obj.firstArrival || {}, read);
+      var jumps = sanitizeJumps(obj.jumps || [], stack.length);
+      return {
+        cur: obj.cur,
+        stack: stack,
+        read: read,
+        endings: (obj.endings || []).filter(function (n) {
+          return SECTIONS.hasOwnProperty(String(n));
+        }),
+        firstArrival: firstArrival,
+        jumps: jumps
+      };
+    } catch (e) { return null; }
+  }
+
+  // Stack indices entered via a story-tree jump. Older saves have none,
+  // which just gives ordinary linear Undo everywhere.
+  function sanitizeJumps(arr, stackLen) {
+    var seen = {};
+    var out = [];
+    (Array.isArray(arr) ? arr : []).forEach(function (n) {
+      n = Number(n);
+      if (n === (n | 0) && n >= 1 && n < stackLen && !seen[n]) {
+        seen[n] = true;
+        out.push(n);
+      }
+    });
+    return out.sort(function (a, b) { return a - b; });
+  }
+
+  // Keep only firstArrival entries whose section and parent are both lit
+  // and valid, and whose edge index exists on the parent. This prevents a
+  // tampered/imported save from breaking the tree layout.
+  function sanitizeFirstArrival(fa, read) {
+    var out = {};
+    Object.keys(fa).forEach(function (k) {
+      var sec = parseInt(k, 10);
+      if (!read[sec]) return;
+      var rec = fa[k];
+      if (!rec || typeof rec.parent !== "number") return;
+      if (!read[rec.parent] && rec.parent !== START) return;
+      var psec = SECTIONS[String(rec.parent)];
+      if (!psec || typeof rec.edgeIdx !== "number" ||
+          rec.edgeIdx < 0 || rec.edgeIdx >= psec.e.length) return;
+      if (psec.e[rec.edgeIdx][0] !== sec) return;
+      out[sec] = { parent: rec.parent, edgeIdx: rec.edgeIdx };
+    });
+    return out;
+  }
+
+  // Apply a loaded pack to the runtime: the body text always replaces
+  // textPack; an optional "structure" section (same shape as
+  // book_structure.json) additionally overlays the runtime SECTIONS'
+  // choice labels and prompts, so a localised pack can translate the
+  // options too. English packs without a structure behave exactly as
+  // before (structure overlay is purely additive).
+  function applyPack(packObj) {
+    textPack = packObj.sections;
+    inlinePack = false;
+    var locale = packObj.ui_locale === "zh" ? "zh" : "en";
+    uiLocale = locale;
+    packInfo = {
+      book: packObj.book || "",
+      sections: Object.keys(packObj.sections).length,
+      locale: locale
+    };
+    if (!packObj.structure || !packObj.structure.sections) return locale;
+    var ov = packObj.structure.sections;
+    for (var k in ov) {
+      var sec = SECTIONS[k];
+      var node = ov[k];
+      if (!sec || !node) continue;
+      if (node.prompt != null) sec.p = node.prompt;
+      if (Array.isArray(node.edges)) {
+        // Overlay labels by position, guarding on matching targets so a
+        // mis-ordered overlay can never corrupt a wrong edge.
+        for (var i = 0; i < node.edges.length && i < sec.e.length; i++) {
+          var oe = node.edges[i];
+          var se = sec.e[i];
+          if (oe.target === se[0] &&
+              (oe.kind === undefined || oe.kind === se[1]) &&
+              oe.label != null) {
+            se[2] = oe.label;
+          }
+        }
+      }
+    }
+    return locale;
+  }
+
+  // Host API used by the encrypted-vault front end: apply a pack that was
+  // decrypted in memory, switch the reading body to the original text and
+  // re-localise the whole reader. No storage is touched here; the caller
+  // keeps the pack only for the lifetime of the page. Resolves false when
+  // the Chinese UI asset could not be loaded.
+  function applyPackFromHost(packObj) {
+    var locale = packObj.ui_locale === "zh" ? "zh" : "en";
+    return new Promise(function (resolve) {
+      ensureLocale(locale, function (ok) {
+        if (!ok) { resolve(false); return; }
+        applyPack(packObj);
+        mode = "original";
+        refreshPackStatus();
+        applyLocale();
+        resolve(true);
+      });
+    });
+  }
+
+  function loadStoredPack() {
+    if (inlinePack) return null;
+    // Entry (multi-book) hosts keep text packs in IndexedDB and hand the
+    // sections over at mount time; standalone packages use localStorage.
+    if (HOOKS.providedPack) {
+      var provided = HOOKS.providedPack();
+      if (provided) {
+        // Entry hosts may hand over either a bare sections map (English
+        // packs) or a full pack object carrying a localised structure.
+        if (provided.sections) return provided;
+        textPack = provided;
+      }
+      return null;
+    }
+    try {
+      var raw = localStorage.getItem(PACK_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (obj && obj.kind === PACK_KIND && obj.sections) return obj;
+    } catch (e) { /* corrupt pack: ignore */ }
+    return null;
+  }
+
+  function freshState() {
+    return { cur: START, stack: [START], read: {}, endings: [],
+             firstArrival: {}, jumps: [] };
+  }
+
+  // ---------------- navigation ----------------
+  function gotoSection(target) {
+    target = Number(target);
+    if (!SECTIONS.hasOwnProperty(String(target))) return;
+    var firstVisit = !state.read[target];
+    if (firstVisit) {
+      // Keep the exact edge used for the first arrival in the save (older
+      // saves still carry this field even though the tree view is retired).
+      var from = state.cur;
+      var psec = SECTIONS[String(from)];
+      var idx = -1;
+      if (psec) {
+        for (var i = 0; i < psec.e.length; i++) {
+          if (psec.e[i][0] === target) { idx = i; break; }
+        }
+      }
+      if (idx >= 0) state.firstArrival[target] = { parent: from, edgeIdx: idx };
+    }
+    state.stack.push(target);
+    state.cur = target;
+    state.read[target] = true;
+    var sec = SECTIONS[String(target)];
+    if (!sec.e.length && sec.en && state.endings.indexOf(target) < 0) {
+      state.endings.push(target);
+    }
+    persist();
+    renderChapter();
+    window.scrollTo(0, 0);
+  }
+
+  // Undo: sections entered by an old tree-style teleport jump (legacy saves
+  // only) have no single "previous" section. Instead return to a section
+  // that can lead into the current one in the book graph and that the
+  // reader has already visited:
+  //   - exactly one such predecessor  -> step straight back to it
+  //   - several                        -> ask which one
+  //   - none                           -> fall back to the prior frame
+  // Frames reached by an ordinary choice undo linearly, as before.
+  function undo() {
+    if (state.stack.length <= 1) return;
+    var top = state.stack.length - 1;
+    if (state.jumps.indexOf(top) >= 0) {
+      var preds = readPredecessors(state.cur);
+      if (preds.length === 1) { stepBackTo(preds[0]); return; }
+      if (preds.length > 1) { openJumpBack(preds); return; }
+    }
+    state.stack.pop();
+    state.cur = state.stack[state.stack.length - 1];
+    state.jumps = (state.jumps || []).filter(function (k) { return k < top; });
+    persist();
+    renderChapter();
+    window.scrollTo(0, 0);
+  }
+
+  // All sections with an edge into `sec` that the reader has visited.
+  // Deterministic numeric order.
+  function readPredecessors(sec) {
+    var out = [];
+    Object.keys(SECTIONS).forEach(function (k) {
+      var p = Number(k);
+      if (!state.read[p]) return;
+      var edges = SECTIONS[k].e || [];
+      for (var i = 0; i < edges.length; i++) {
+        if (edges[i][0] === sec) { out.push(p); break; }
+      }
+    });
+    return out.sort(function (a, b) { return a - b; });
+  }
+
+  function jumpBackSnippet(sec) {
+    var d = SECTIONS[String(sec)];
+    var raw = d && d.s ? d.s : "";
+    var txt = String(raw).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    return txt.length > 90 ? txt.slice(0, 90) + "…" : txt;
+  }
+
+  // Ask which already-read predecessor of the current section to return to.
+  function openJumpBack(preds) {
+    var backdrop = $("jumpback-backdrop");
+    var list = $("jumpback-list");
+    list.innerHTML = "";
+    preds.forEach(function (sec) {
+      var b = document.createElement("button");
+      b.className = "jumpback-item btn btn-ghost";
+      b.type = "button";
+      b.innerHTML =
+        '<span class="jumpback-no">' + esc(pad3(sec)) + "</span>" +
+        '<span class="jumpback-sum">' + esc(jumpBackSnippet(sec)) + "</span>";
+      b.addEventListener("click", function () { stepBackTo(sec); });
+      list.appendChild(b);
+    });
+    backdrop.hidden = false;
+  }
+
+  function closeJumpBack() {
+    $("jumpback-backdrop").hidden = true;
+  }
+
+  // Replace the jump frame with the chosen predecessor (the teleported
+  // frame is consumed, so undoing again from there behaves normally).
+  function stepBackTo(sec) {
+    state.stack.pop();
+    state.stack.push(sec);
+    state.cur = sec;
+    var top = state.stack.length - 1;
+    state.jumps = (state.jumps || []).filter(function (k) { return k !== top; });
+    persist();
+    closeJumpBack();
+    renderChapter();
+    window.scrollTo(0, 0);
+  }
+
+  function startNewLine() {
+    state.stack = [START];
+    state.cur = START;
+    state.read[START] = true;
+    state.jumps = [];
+    persist();
+    showChapter();
+  }
+
+  // ---------------- rendering: screens ----------------
+  function showTitle() {
+    $("title-screen").hidden = false;
+    $("chapter-screen").hidden = true;
+    $("settings-backdrop").hidden = true;
+    var saved = loadSave();
+    var has = !!saved;
+    $("btn-continue").hidden = !has;
+    var readMap = state ? state.read : (saved ? saved.read : {});
+    var pct = pctOf(readMap).toFixed(2);
+    $("title-progress-fill").style.width = pct + "%";
+    $("title-progress-text").textContent = t("pctRead", { pct: pct });
+    $("title-save-note").textContent =
+      (inlinePack ? t("noteBuiltin") :
+       packAvailable() ? t("notePack") :
+       t("noteSkeleton")) +
+      t("noteProgress");
+  }
+
+  function showChapter() {
+    $("title-screen").hidden = true;
+    $("chapter-screen").hidden = false;
+    renderChapter();
+  }
+
+  // The old in-page story tree is retired: the top bar opens the book's
+  // full route map page instead (progress travels via localStorage and the
+  // ?visited= fallback).
+
+  // Progress = original-text characters of read sections / whole book.
+  // Falls back to section counting only if a build lacks word weights.
+  function readWords(readMap) {
+    var n = 0;
+    Object.keys(readMap).forEach(function (k) {
+      var sec = SECTIONS[k];
+      n += sec && typeof sec.w === "number" ? sec.w : 0;
+    });
+    return n;
+  }
+
+  function pctOf(readMap) {
+    if (TOTAL_WORDS > 0) return readWords(readMap) / TOTAL_WORDS * 100;
+    return Object.keys(readMap).length / TOTAL * 100;
+  }
+
+  function progressPct() {
+    return pctOf(state.read).toFixed(2);
+  }
+
+  // Always-on chapter top bar stats: weighted read percentage with a thin
+  // live progress bar, and the endings counter. The endings total is hidden
+  // until every ending has been reached ("Endings found: n / N - all found").
+  function updateTopbarStats() {
+    var pct = progressPct();
+    var pctEl = $("chapter-progress");
+    var fill = $("topbar-progress-fill");
+    if (pctEl) pctEl.textContent = t("pctRead", { pct: pct });
+    if (fill) fill.style.width = pct + "%";
+
+    var counter = $("endings-counter");
+    if (counter) {
+      var found = state.endings.length;
+      if (ENDING_TOTAL > 0 && found >= ENDING_TOTAL) {
+        counter.textContent =
+          t("endingsAll", { n: found, total: ENDING_TOTAL });
+      } else {
+        counter.textContent = t("endingsFound", { n: found });
+      }
+    }
+  }
+
+  // State of the Summary | Original segmented control in the chapter top bar.
+  function updateModeControl() {
+    var sum = $("btn-mode-summary");
+    var orig = $("btn-mode-original");
+    if (!sum || !orig) return;
+    var available = packAvailable();
+    orig.disabled = !available;
+    sum.classList.toggle("seg-active", mode === "summary");
+    orig.classList.toggle("seg-active", mode === "original");
+    sum.setAttribute("aria-pressed", mode === "summary" ? "true" : "false");
+    orig.setAttribute("aria-pressed", mode === "original" ? "true" : "false");
+    // overflow-menu proxies (visible only when the control is moved there)
+    var psum = $("tbmore-mode-summary"), porig = $("tbmore-mode-original");
+    if (psum && porig) {
+      porig.disabled = !available;
+      psum.classList.toggle("seg-active", mode === "summary");
+      porig.classList.toggle("seg-active", mode === "original");
+    }
+  }
+
+  // ---- persistent vs overflow ("More") top bar items ----
+  // Build the overflow menu's proxy nodes once. Each maps 1:1 to a
+  // data-tbkey item; applyTopbar() shows a proxy exactly when its primary
+  // item has been unticked in Settings.
+  function buildTbMoreMenu() {
+    var menu = $("tbmore-menu");
+    if (!menu || menu._built) return;
+    menu._built = true;
+    menu.innerHTML =
+      '<div class="tbmore-item" data-more="section">' + t("tbSection") +
+        '<span class="tbmore-val" id="tbmore-section">001</span></div>' +
+      '<div class="tbmore-item" data-more="progress">' + t("tbRead") +
+        '<span class="tbmore-val" id="tbmore-section-prog"></span></div>' +
+      '<div class="tbmore-item" data-more="endings" style="display:block">' +
+        '<span id="tbmore-endings">' + t("endingsFound", { n: 0 }) +
+        "</span></div>" +
+      '<div class="tbmore-item" data-more="mode">' +
+        '<div class="seg-control tbmore-seg">' +
+          '<button id="tbmore-mode-summary" type="button" class="seg-btn">' +
+            t("tbSummary") + '</button>' +
+          '<button id="tbmore-mode-original" type="button" class="seg-btn">' +
+            t("tbOriginal") + '</button>' +
+        '</div></div>' +
+      '<button type="button" class="tbmore-item" data-more="home">' +
+        '<span id="tbmore-home-label">' + t("tbShelf") + '</span></button>';
+    $("tbmore-mode-summary").addEventListener("click", function () {
+      setMode("summary");
+    });
+    $("tbmore-mode-original").addEventListener("click", function () {
+      setMode("original");
+    });
+    menu.querySelector('[data-more="home"]').addEventListener("click", goHome);
+  }
+
+  function applyTopbar() {
+    buildTbMoreMenu();
+    var anyHidden = false;
+    TB_KEYS.forEach(function (key) {
+      var persistent = gSettings.tb[key] !== false;
+      Array.prototype.forEach.call(
+        ROOT.querySelectorAll('[data-tbkey="' + key + '"]'),
+        function (el) { el.hidden = !persistent; });
+      var proxy = ROOT.querySelector('[data-more="' + key + '"]');
+      if (proxy) proxy.hidden = persistent;
+      if (!persistent) anyHidden = true;
+    });
+    var moreBtn = $("btn-tbmore");
+    if (moreBtn) moreBtn.hidden = !anyHidden;
+    var menu = $("tbmore-menu");
+    if (menu && !anyHidden) menu.hidden = true;
+  }
+
+  function syncTbMoreValues() {
+    var sec = $("tbmore-section");
+    if (sec) sec.textContent = pad3(state.cur);
+    var prog = $("tbmore-section-prog");
+    if (prog) prog.textContent = progressPct() + "%";
+    var en = $("tbmore-endings");
+    if (en) en.textContent = $("endings-counter").textContent;
+  }
+
+  function goHome() {
+    if (HOOKS.onHome) { HOOKS.onHome(); return; }
+    showTitle();
+  }
+
+  // ---------------- rendering: chapter ----------------
+  function renderChapter() {
+    var sec = SECTIONS[String(state.cur)];
+    $("chapter-num").textContent = pad3(state.cur);
+    updateTopbarStats();
+    syncTbMoreValues();
+    $("btn-undo").disabled = state.stack.length <= 1;
+
+    // body text
+    var box = $("chapter-text");
+    var html = "";
+    if (mode === "original" && packAvailable() &&
+        textPack[String(state.cur)]) {
+      var segs = textPack[String(state.cur)];
+      html = segs.map(function (g) {
+        return g.t === "p" ? "<p>" + g.html + "</p>" : "";
+      }).join("");
+    } else {
+      html = "<p>" + esc(sec.s) + "</p>";
+    }
+    box.innerHTML = html;
+    if (sec.p) {
+      box.insertAdjacentHTML("beforeend",
+        '<div class="chapter-prompt">' + esc(sec.p) + "</div>");
+    }
+
+    // Return to the top of the article on every chapter switch. The
+    // scroll container is .chapter-body (overflow-y: auto), not the
+    // window, so window.scrollTo() does not reset the reading position.
+    var bodyEl = document.querySelector(".chapter-body");
+    if (bodyEl) bodyEl.scrollTop = 0;
+    window.scrollTo(0, 0);
+
+    // reading-mode segmented control (Summary | Original)
+    updateModeControl();
+
+    var isEnding = !sec.e.length;
+    $("ending-banner").hidden = !isEnding;
+    // The dock action row is always present: Undo sits at the bottom-right
+    // next to the choices; Restart joins it only on an ending section.
+    var restartBtn = $("btn-ending-restart");
+    if (restartBtn) {
+      restartBtn.hidden = !isEnding;
+      if (isEnding) {
+        restartBtn.textContent = t("restartFrom", { sec: pad3(START) });
+      }
+    }
+    if (isEnding) renderEnding(sec);
+
+    $("mechanic-note").innerHTML = "";
+    var choices = $("choices");
+    choices.innerHTML = "";
+    if (!isEnding) renderEdges(sec, choices);
+  }
+
+  function renderEnding(sec) {
+    var banner = $("ending-banner");
+    banner.className = "ending-banner et-" + (sec.en || "neutral");
+    var labelKey = ({
+      death: "endDeath", bad: "endBad",
+      neutral: "endNeutral", good: "endGood"
+    })[sec.en || "neutral"];
+    $("ending-banner-text").innerHTML = t(labelKey) +
+      ' &middot; <span style="letter-spacing:.06em">' +
+      t("endRead", { pct: progressPct() }) + "</span>";
+  }
+
+  // ---------------- rendering: options & mechanics ----------------
+  function choiceButton(label, target, extraClass) {
+    var b = document.createElement("button");
+    b.className = "btn choice-btn" + (extraClass ? " " + extraClass : "");
+    b.innerHTML =
+      '<img class="choice-bullet" src="' + ICON + '" alt="">' +
+      '<span class="choice-label">' + esc(label) + "</span>" +
+      '<span class="choice-target">' + pad3(target) + "</span>";
+    b.addEventListener("click", function () { gotoSection(target); });
+    return b;
+  }
+
+  function renderEdges(sec, choices) {
+    var kinds = sec.e.map(function (e) { return e[1]; });
+    var note = $("mechanic-note");
+
+    if (kinds.indexOf("date") >= 0) { renderDate(sec, choices, note); return; }
+    if (kinds.indexOf("dice") >= 0) { renderDice(sec, choices, note); return; }
+    if (kinds.indexOf("coin") >= 0) { renderCoin(sec, choices, note); return; }
+
+    sec.e.forEach(function (edge) {
+      var target = edge[0], kind = edge[1], label = edge[2];
+      if (kind === "forced") {
+        choices.appendChild(choiceButton(t("continueWord"), target));
+      } else if (kind === "puzzle") {
+        // 056 secret door: no input box, no code shown, one confident button.
+        choices.appendChild(
+          choiceButton(t("puzzleDone"), target, "is-puzzle"));
+      } else if (kind === "choice") {
+        choices.appendChild(choiceButton(label, target));
+      }
+    });
+  }
+
+  // 034 - only the exit matching the effective date is rendered.
+  // Labels may be English ("weekday"/"weekend") or localised; the Chinese
+  // spellings are kept as escapes so the default bundle stays ASCII-only.
+  function renderDate(sec, choices, note) {
+    var real = todayKind();
+    var effective = pretendDate || real;
+    var edge = sec.e.filter(function (e) {
+      var l = e[2].toLowerCase();
+      if (effective === "weekday") {
+        return l.indexOf("weekday") >= 0 ||
+          l.indexOf("\u5de5\u4f5c\u65e5") >= 0;
+      }
+      return l.indexOf("weekend") >= 0 ||
+        l.indexOf("\u5468\u672b") >= 0;
+    })[0];
+
+    var realWord = t(real);
+    var pretendWord = t(real === "weekday" ? "weekend" : "weekday");
+
+    var html = pretendDate
+      ? t("datePretend", { real: realWord, fake: t(pretendDate) })
+      : t("dateReal", { day: realWord });
+    note.innerHTML = html;
+
+    var toggle = document.createElement("a");
+    toggle.href = "#";
+    toggle.className = "pretend-link";
+    toggle.textContent = pretendDate
+      ? t("dateUseReal", { day: realWord })
+      : t("datePretendLink", { day: pretendWord });
+    toggle.style.color = "var(--gold-bright)";
+    toggle.style.fontSize = ".88rem";
+    toggle.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      // Internal value stays the English enum; only rendering is localised.
+      pretendDate = pretendDate
+        ? null : (real === "weekday" ? "weekend" : "weekday");
+      renderChapter();
+    });
+    note.appendChild(document.createTextNode(" "));
+    note.appendChild(toggle);
+
+    choices.appendChild(choiceButton(edge[2], edge[0]));
+  }
+
+  // 009 - roll 1d6: 6 -> 018, anything else -> 087.
+  function renderDice(sec, choices, note) {
+    var win = sec.e.filter(function (e) { return e[0] === 18; })[0];
+    var lose = sec.e.filter(function (e) { return e[0] === 87; })[0];
+
+    var row = document.createElement("div");
+    row.className = "randomiser";
+    var rollBtn = document.createElement("button");
+    rollBtn.className = "btn btn-primary";
+    rollBtn.textContent = t("diceRoll");
+    var out = document.createElement("span");
+    out.className = "random-output";
+    out.textContent = "\u2022";
+    row.appendChild(rollBtn);
+    row.appendChild(out);
+    choices.appendChild(row);
+
+    rollBtn.addEventListener("click", function () {
+      rollBtn.disabled = true;
+      out.classList.add("rolling");
+      var ticks = 0;
+      clearInterval(rollTimer);
+      rollTimer = setInterval(function () {
+        out.textContent = String(1 + Math.floor(Math.random() * 6));
+        if (++ticks >= 8) {
+          clearInterval(rollTimer);
+          var n = 1 + Math.floor(Math.random() * 6);
+          out.classList.remove("rolling");
+          out.textContent = String(n);
+          var dest = n === 6 ? win : lose;
+          note.textContent = t("diceResult", { n: n }) +
+            (n === 6 ? t("diceLucky") : "");
+          setTimeout(function () { gotoSection(dest[0]); }, 850);
+        }
+      }, 90);
+    });
+
+    addManualDivider(choices);
+    choices.appendChild(choiceButton(
+      t("goTo", { label: win[2], sec: pad3(win[0]) }), win[0]));
+    choices.appendChild(choiceButton(
+      t("goTo", { label: lose[2], sec: pad3(lose[0]) }), lose[0]));
+  }
+
+  // 130 - fair coin: heads -> 091, tails -> 138.
+  function renderCoin(sec, choices, note) {
+    var heads = sec.e.filter(function (e) { return e[0] === 91; })[0];
+    var tails = sec.e.filter(function (e) { return e[0] === 138; })[0];
+
+    var row = document.createElement("div");
+    row.className = "randomiser";
+    var tossBtn = document.createElement("button");
+    tossBtn.className = "btn btn-primary";
+    tossBtn.textContent = t("coinToss");
+    var out = document.createElement("span");
+    out.className = "random-output";
+    out.textContent = "\u2022";
+    row.appendChild(tossBtn);
+    row.appendChild(out);
+    choices.appendChild(row);
+
+    tossBtn.addEventListener("click", function () {
+      tossBtn.disabled = true;
+      out.classList.add("rolling");
+      var ticks = 0;
+      clearInterval(rollTimer);
+      rollTimer = setInterval(function () {
+        out.textContent = ticks % 2 ? "H" : "T";
+        if (++ticks >= 9) {
+          clearInterval(rollTimer);
+          var headsUp = Math.random() < 0.5;
+          out.classList.remove("rolling");
+          out.textContent = headsUp ? t("headsUp") : t("tailsUp");
+          var dest = headsUp ? heads : tails;
+          setTimeout(function () { gotoSection(dest[0]); }, 850);
+        }
+      }, 90);
+    });
+
+    addManualDivider(choices);
+    choices.appendChild(choiceButton(
+      t("goTo", { label: t("heads"), sec: pad3(heads[0]) }), heads[0]));
+    choices.appendChild(choiceButton(
+      t("goTo", { label: t("tails"), sec: pad3(tails[0]) }), tails[0]));
+  }
+
+  function addManualDivider(choices) {
+    var d = document.createElement("div");
+    d.className = "manual-divider";
+    d.textContent = t("manualDivider");
+    choices.appendChild(d);
+  }
+
+  // ---------------- settings ----------------
+  function refreshPackStatus() {
+    var status = $("pack-status");
+    if (status) {
+      if (inlinePack) {
+        status.textContent = t("statusBuiltin");
+      } else if (packAvailable() && packInfo) {
+        status.textContent = t(packInfo.locale === "zh"
+          ? "statusLoadedZh" : "statusLoadedEn", {
+          book: packInfo.book || SLUG,
+          n: packInfo.sections
+        });
+      } else {
+        status.textContent = HOOKS.providedPack
+          ? t("entryStatusNone") : t("statusNone");
+      }
+    }
+    // The remove-pack button only makes sense for a localStorage-loaded
+    // pack in a standalone package (never for the built-in full edition).
+    var unloadBtn = $("btn-unload-pack");
+    if (unloadBtn) {
+      unloadBtn.hidden = inlinePack || HOOKS.providedPack ||
+        !packAvailable();
+    }
+    updateModeControl();
+  }
+
+  function setMode(m) {
+    if (m === "original" && !packAvailable()) return;
+    mode = m;
+    refreshPackStatus();
+    if (!$("chapter-screen").hidden) renderChapter();
+  }
+
+  function exportSave() {
+    var raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) { toast(t("noSave")); return; }
+    var blob = new Blob([raw], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = SAVE_EXPORT_NAME;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+  }
+
+  function importSave(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var msg = $("settings-message");
+      try {
+        var obj = JSON.parse(reader.result);
+        if (!obj || (obj.v !== 1 && obj.v !== SAVE_VERSION) ||
+            !SECTIONS.hasOwnProperty(String(obj.cur))) {
+          throw new Error("bad version");
+        }
+        var readArr = obj.read || [];
+        var readTmp = {};
+        readArr.forEach(function (n) {
+          if (SECTIONS.hasOwnProperty(String(n))) readTmp[n] = true;
+        });
+        var fa = sanitizeFirstArrival(obj.firstArrival || {}, readTmp);
+        localStorage.setItem(SAVE_KEY, JSON.stringify({
+          v: SAVE_VERSION,
+          cur: obj.cur,
+          stack: obj.stack || [obj.cur],
+          read: readArr,
+          endings: obj.endings || [],
+          firstArrival: fa,
+          jumps: sanitizeJumps(obj.jumps || [],
+                               (obj.stack || [obj.cur]).length)
+        }));
+        state = loadSave() || freshState();
+        msg.classList.remove("error");
+        msg.textContent = t("saveImported", { sec: pad3(state.cur) });
+        showTitle();
+      } catch (e) {
+        msg.classList.add("error");
+        msg.textContent = t("saveBad");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function importPack(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var msg = $("settings-message");
+      var obj;
+      try {
+        obj = JSON.parse(reader.result);
+        if (!obj || obj.kind !== PACK_KIND || !obj.sections) {
+          throw new Error("bad pack");
+        }
+      } catch (e) {
+        msg.classList.add("error");
+        msg.textContent = t("packBad");
+        return;
+      }
+      var locale = obj.ui_locale === "zh" ? "zh" : "en";
+      ensureLocale(locale, function (ok) {
+        if (!ok) {
+          msg.classList.add("error");
+          msg.textContent = t("packUiMissing");
+          return;
+        }
+        localStorage.setItem(PACK_KEY, JSON.stringify(obj));
+        applyPack(obj);
+        inlinePack = false;
+        msg.classList.remove("error");
+        msg.textContent = t("packLoaded", {
+          n: Object.keys(textPack).length
+        });
+        setMode("original");
+        applyLocale();
+        refreshPackStatus();
+      });
+    };
+    reader.readAsText(file);
+  }
+
+  // Remove the localStorage text pack. The runtime SECTIONS were mutated in
+  // place by applyPack, so a reload is the clean way to restore the embedded
+  // English structure (and the English UI).
+  function unloadPack() {
+    if (!window.confirm(t("removePackConfirm"))) return;
+    localStorage.removeItem(PACK_KEY);
+    location.reload();
+  }
+
+  // Wipe everything this HTML stored: the reading save AND the loaded pack.
+  // Global, cross-book reader settings (font size, top-bar layout) are shared
+  // by every book and are deliberately left untouched.
+  function resetEverything() {
+    if (!window.confirm(t("resetEverythingConfirm"))) return;
+    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(PACK_KEY);
+    localStorage.removeItem(PROGRESS_KEY);
+    location.reload();
+  }
+
+  // ---------------- wire-up ----------------
+  function bind() {
+    $("btn-continue").addEventListener("click", function () {
+      state = loadSave() || freshState();
+      showChapter();
+    });
+    $("btn-start").addEventListener("click", function () {
+      var saved = loadSave();
+      if (!saved) {
+        state = freshState();
+        state.read[START] = true;
+        persist();
+      } else {
+        state = saved;            // read set is monotonic
+        state.stack = [START];
+        state.cur = START;
+        state.read[START] = true;
+        persist();
+      }
+      showChapter();
+    });
+    $("btn-settings").addEventListener("click", function () {
+      $("settings-message").textContent = "";
+      refreshPackStatus();
+      $("settings-backdrop").hidden = false;
+    });
+    $("btn-settings-close").addEventListener("click", function () {
+      $("settings-backdrop").hidden = true;
+    });
+    $("settings-backdrop").addEventListener("click", function (ev) {
+      if (ev.target === this) this.hidden = true;
+    });
+
+    // The single Undo button lives in the bottom choices dock (id stays
+    // btn-undo whether or not it is an ending section).
+    $("btn-undo").addEventListener("click", undo);
+    $("btn-ending-restart").addEventListener("click", startNewLine);
+    var routeBtn = $("btn-tree");
+    if (routeBtn) {
+      if (ROADMAP_URL) routeBtn.addEventListener("click", openRouteMap);
+      else routeBtn.hidden = true;
+    }
+    $("btn-jumpback-cancel").addEventListener("click", closeJumpBack);
+    $("jumpback-backdrop").addEventListener("click", function (ev) {
+      if (ev.target === this) closeJumpBack();
+    });
+    $("btn-home").addEventListener("click", goHome);
+
+    // top bar overflow ("More") menu toggle
+    $("btn-tbmore").addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var menu = $("tbmore-menu");
+      menu.hidden = !menu.hidden;
+    });
+    ROOT.addEventListener("click", function (ev) {
+      var menu = $("tbmore-menu");
+      if (menu && !menu.hidden && !menu.contains(ev.target) &&
+          ev.target !== $("btn-tbmore") &&
+          !$("btn-tbmore").contains(ev.target)) {
+        menu.hidden = true;
+      }
+    });
+
+    // global settings: reading font size
+    function setFontPx(n) {
+      n = Math.max(12, Math.min(32, parseInt(n, 10) || 16));
+      gSettings.fontPx = n;
+      applyFontSize();
+      saveGlobalSettings();
+    }
+    $("font-size-input").addEventListener("change", function () {
+      setFontPx(this.value);
+    });
+    $("btn-font-dec").addEventListener("click", function () {
+      setFontPx(gSettings.fontPx - 1);
+    });
+    var btnFontInc = $("btn-font-inc");
+    if (btnFontInc) btnFontInc.addEventListener("click", function () {
+      setFontPx(gSettings.fontPx + 1);
+    });
+    $("btn-font-reset").addEventListener("click", function () {
+      setFontPx(DEFAULT_SETTINGS.fontPx);
+    });
+    // persistent top-bar item checkboxes
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-tbcheck]"), function (cb) {
+        cb.addEventListener("change", function () {
+          gSettings.tb[cb.getAttribute("data-tbcheck")] = cb.checked;
+          applyTopbar();
+          if (!$("chapter-screen").hidden) renderChapter();
+          saveGlobalSettings();
+        });
+      });
+
+    $("btn-mode-summary").addEventListener("click", function () {
+      setMode("summary");
+    });
+    $("btn-mode-original").addEventListener("click", function () {
+      setMode("original");
+    });
+
+    $("btn-export").addEventListener("click", exportSave);
+    $("file-save").addEventListener("change", function () {
+      if (this.files[0]) importSave(this.files[0]);
+      this.value = "";
+    });
+    $("file-pack").addEventListener("change", function () {
+      if (this.files[0]) importPack(this.files[0]);
+      this.value = "";
+    });
+    $("btn-clear").addEventListener("click", function () {
+      if (!window.confirm(t("clearConfirm"))) return;
+      localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(PROGRESS_KEY);
+      state = freshState();   // nothing lit, nothing persisted: true 0.00%
+      var msg = $("settings-message");
+      msg.classList.remove("error");
+      msg.textContent = t("clearDone");
+      showTitle();
+    });
+    var btnUnload = $("btn-unload-pack");
+    if (btnUnload) btnUnload.addEventListener("click", unloadPack);
+    var btnResetAll = $("btn-reset-everything");
+    if (btnResetAll) btnResetAll.addEventListener("click", resetEverything);
+  }
+
+  // ---------------- localisation application ----------------
+  // Static template labels carry data-i18n / data-i18n-html /
+  // data-i18n-title / data-i18n-aria attributes; applyLocale rewrites them
+  // whenever the active pack changes the UI language.
+  function localizeStatic() {
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n]"), function (el) {
+        el.textContent = t(el.getAttribute("data-i18n"));
+      });
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n-html]"), function (el) {
+        el.innerHTML = t(el.getAttribute("data-i18n-html"));
+      });
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n-title]"), function (el) {
+        el.title = t(el.getAttribute("data-i18n-title"));
+      });
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n-aria]"), function (el) {
+        el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria")));
+      });
+    // The restart button is hidden until an ending is reached, but keep its
+    // text localised so no English string survives in a Chinese DOM.
+    var restartBtn = $("btn-ending-restart");
+    if (restartBtn) {
+      restartBtn.textContent = t("restartFrom", { sec: pad3(START) });
+    }
+    document.documentElement.lang = uiLocale === "zh" ? "zh-CN" : "en";
+    try {
+      document.dispatchEvent(new CustomEvent("agb-localechange", {
+        detail: { locale: uiLocale }
+      }));
+    } catch (e) { /* older browsers: ignore */ }
+  }
+
+  function applyLocale() {
+    localizeStatic();
+    updateHomeLabels();
+    // The "More" overflow menu is built once; rebuild it in the new language.
+    var menu = $("tbmore-menu");
+    if (menu) { menu._built = false; menu.innerHTML = ""; }
+    applyTopbar();
+    if (!$("title-screen").hidden) showTitle();
+    if (!$("chapter-screen").hidden) renderChapter();
+  }
+
+  function updateHomeLabels() {
+    var homeLabel = $("btn-home-label");
+    var homeBtn = $("btn-home");
+    var homeMoreLabel = $("tbmore-home-label");
+    var homeText = HOOKS.onHome ? t("homeShelf") : t("homeTitle");
+    if (homeLabel) homeLabel.textContent = homeText;
+    if (homeMoreLabel) homeMoreLabel.textContent = homeText;
+    if (homeBtn) {
+      homeBtn.title = HOOKS.onHome ? t("homeShelfTip") : t("homeTitleTip");
+    }
+  }
+
+  // ---------------- boot ----------------
+  function renderBookIdentity() {
+    var name = META.title || DATA.book || t("gamebook");
+    $("title-name").textContent = name;
+    if (HOOKS.setTitle) { HOOKS.setTitle(META.full_title || name); }
+    else { document.title = META.full_title || name; }
+    var sub = META.subtitle || "";
+    $("title-sub").textContent = sub;
+    var kickerParts = [];
+    if (META.series) {
+      kickerParts.push(META.series +
+        (META.series_number ? " " + META.series_number : ""));
+    }
+    kickerParts.push(t("kicker"));
+    $("title-kicker").textContent = kickerParts.join(" \u00b7 ");
+    if (META.cover) $("title-cover").src = META.cover;
+    $("title-cover").hidden = !META.cover;
+
+    updateHomeLabels();
+
+    // In the multi-book entry, per-book actions (text pack import, save
+    // export/import/clear) live in the book card menu on the shelf, so the
+    // standalone-only Settings blocks are removed here.
+    if (HOOKS.providedPack) {
+      Array.prototype.forEach.call(
+        ROOT.querySelectorAll(".js-standalone-only"),
+        function (el) { el.remove(); });
+      var note = $("pack-status");
+      if (note && !packAvailable()) {
+        note.textContent = t("entryStatusNone");
+      }
+    }
+  }
+
+  function syncSettingsChecks() {
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-tbcheck]"), function (cb) {
+        var key = cb.getAttribute("data-tbcheck");
+        cb.checked = gSettings.tb[key] !== false;
+      });
+  }
+
+  // A route-map node links back with ?section=<n>. A section already in the
+  // save is restored as a jump (undo knows how to step back); an unvisited
+  // section is accepted only when it is a direct choice from the current
+  // section, so the map cannot write a false read path.
+  function openMapSection() {
+    var match = /(?:^|[?&])section=([0-9]+)/.exec(window.location.search || "");
+    if (!match) return;
+    var target = Number(match[1]);
+    var sec = SECTIONS[String(target)];
+    if (!sec) return;
+    if (target === state.cur) { showChapter(); return; }
+    var allowed = !!state.read[target];
+    if (!allowed) {
+      var cur = SECTIONS[String(state.cur)];
+      if (cur) {
+        for (var i = 0; i < cur.e.length; i++) {
+          if (cur.e[i][0] === target) { allowed = true; break; }
+        }
+      }
+    }
+    if (!allowed) return;
+    showChapter();
+    if (state.read[target]) {
+      state.stack.push(target);
+      state.cur = target;
+      state.jumps = state.jumps || [];
+      state.jumps.push(state.stack.length - 1);
+      persist();
+      renderChapter();
+      window.scrollTo(0, 0);
+    } else {
+      gotoSection(target);
+    }
+  }
+
+  function boot() {
+    var storedPack = loadStoredPack();
+    state = loadSave();
+    if (!state) {
+      state = freshState(); // title offers Start New; nothing persisted yet
+    } else {
+      writeProgress();      // carry an existing save into the map history
+    }
+    bind();
+    applyFontSize();
+    syncSettingsChecks();
+
+    function finish() {
+      localizeStatic();
+      applyTopbar();
+      renderBookIdentity();
+      refreshPackStatus();
+      showTitle();
+      openMapSection();
+    }
+
+    if (storedPack) {
+      var locale = storedPack.ui_locale === "zh" ? "zh" : "en";
+      ensureLocale(locale, function (ok) {
+        if (ok) applyPack(storedPack);
+        else uiLocale = "en";
+        finish();
+      });
+    } else {
+      finish();
+    }
+  }
+
+  if (opts.exposePackApi) {
+    window.AGBReader = { applyPack: applyPackFromHost };
+  }
+
+  // Mount boots the title screen and returns a small handle the host uses
+  // to tear the instance down (clears timers) when leaving the book.
+  boot();
+  return {
+    showChapter: showChapter,
+    unmount: function () { if (rollTimer) clearInterval(rollTimer); }
+  };
+  }
+
+  // ---------------- static helpers usable without a mounted reader -------
+  function makeController(opts) {
+    return startReader(opts);
+  }
+
+  // Shelf progress: compute weighted read percentage + has-save + endings
+  // found, directly from a save in localStorage (or an explicit save obj).
+  function progressInfo(DATA, saveObj) {
+    var sections = DATA.sections;
+    var totalWords = DATA.total_words || 0;
+    var total = DATA.count;
+    var readMap = {};
+    var endings = [];
+    var has = false;
+    var cur = null;
+    if (saveObj) {
+      has = true;
+      cur = saveObj.cur;
+      (saveObj.read || []).forEach(function (n) {
+        if (sections.hasOwnProperty(String(n))) readMap[n] = true;
+      });
+      endings = (saveObj.endings || []).filter(function (n) {
+        return sections.hasOwnProperty(String(n));
+      });
+    }
+    var words = 0;
+    Object.keys(readMap).forEach(function (k) {
+      var sec = sections[k];
+      if (sec && typeof sec.w === "number") words += sec.w;
+    });
+    var pct = totalWords > 0
+      ? words / totalWords * 100
+      : Object.keys(readMap).length / total * 100;
+    var endingTotal = 0;
+    Object.keys(sections).forEach(function (k) {
+      if (!sections[k].e.length) endingTotal++;
+    });
+    return {
+      hasSave: has, cur: cur, pct: pct,
+      readCount: Object.keys(readMap).length,
+      endingsFound: endings.length, endingTotal: endingTotal
+    };
+  }
+
+  function readSave(slug) {
+    try {
+      var raw = localStorage.getItem(slug + ".save.v1");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  window.ASReader = {
+    mount: function (rootEl, DATA, inlinePackSections, hooks) {
+      return makeController({
+        root: rootEl, DATA: DATA,
+        inlinePackSections: inlinePackSections || null,
+        hooks: hooks || null
+      });
+    },
+    progressInfo: progressInfo,
+    readSave: readSave
+  };
+
+  // Standalone package self-starts only when a book payload is embedded.
+  // The multi-book entry never defines window.BOOK_DATA, so this is inert
+  // there even though the same reader markup exists in its DOM.
+  if (window.BOOK_DATA) {
+    var inline = window.TEXT_PACK && window.TEXT_PACK.sections
+      ? window.TEXT_PACK.sections : null;
+    var runStandalone = function () {
+      makeController({
+        root: document, DATA: window.BOOK_DATA,
+        inlinePackSections: inline, hooks: null, exposePackApi: true
+      });
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", runStandalone);
+    } else {
+      runStandalone();
+    }
+  }
+})();
+
+</script>
+</body>
+</html>

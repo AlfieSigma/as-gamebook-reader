@@ -1,0 +1,2503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gamebook</title>
+<style>
+/* AS Gamebook Reader - shared TARDIS blue theme. English UI only. */
+:root {
+  --tardis: #00203c;
+  --tardis-deep: #001224;
+  --tardis-panel: #0b2e4f;
+  --tardis-line: #2a5a86;
+  --gold: #c9a24a;
+  --gold-bright: #e8c870;
+  --text: #e9f1f8;
+  --text-dim: #9fb8cc;
+  --death: #d0453a;
+  --bad: #e08a2e;
+  --neutral: #8a97a3;
+  --good: #4fae6a;
+  --radius: 10px;
+  --maxw: 720px;
+  /* Themeable surfaces. Defaults are the original TARDIS-blue values; a book
+     theme overrides these tokens without touching the shared layout. */
+  --tardis-glow: #0a3a66;
+  --btn-top: #144a78;
+  --btn-bottom: #0d3a61;
+  --btn-primary-top: #3d6ea0;
+  --btn-primary-bottom: #1c4c79;
+  --btn-ghost-bg: rgba(11,46,79,.55);
+  --gold-glow-12: rgba(201,162,74,.12);
+  --gold-glow-35: rgba(201,162,74,.35);
+  --gold-glow-40: rgba(201,162,74,.4);
+  --gold-glow-70: rgba(232,200,112,.7);
+  --gold-glow-80: rgba(232,200,112,.8);
+  --card-grad-a: rgba(11,46,79,.85);
+  --card-grad-b: rgba(0,18,36,.92);
+  --card-inset: rgba(42,90,134,.15);
+  --topbar-bg: rgba(0,20,40,.92);
+  --seg-bg: rgba(0,18,36,.5);
+  --hover-bg: rgba(42,90,134,.25);
+  --hover-bg-strong: rgba(42,90,134,.35);
+  --hover-bg-soft: rgba(42,90,134,.22);
+  --active-bg: rgba(42,90,134,.55);
+  --tag-bg: rgba(42,90,134,.28);
+  --panel-bg: #061a30;
+  --panel-grad-a: #0c3357;
+  --panel-grad-b: #061d34;
+  --fade-mid: rgba(0,16,32,.9);
+  --overlay: rgba(0,8,18,.72);
+  --menu-bg: rgba(0,18,36,.6);
+  --popup-bg: rgba(6,29,52,.95);
+  --line-soft: rgba(42,90,134,.5);
+  --line-solid: rgba(42,90,134,.6);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, var(--tardis-glow) 0%, transparent 60%),
+    linear-gradient(180deg, var(--tardis) 0%, var(--tardis-deep) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  /* rem-based so the reader-wide font-size setting on :root scales the
+     whole rem layout (default 16px root -> 17px body). */
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+
+#app { min-height: 100vh; }
+
+.screen[hidden],
+#title-screen[hidden],
+#chapter-screen[hidden] { display: none !important; }
+
+/* Honour the hidden attribute even on flex/inline-flex components such as
+   the icon buttons and segmented control moved to the overflow menu. */
+[hidden] { display: none !important; }
+
+/* ---------------- Buttons ---------------- */
+.btn {
+  appearance: none;
+  border: 1px solid var(--tardis-line);
+  background: linear-gradient(180deg, var(--btn-top), var(--btn-bottom));
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.62em 1.15em;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, transform .05s;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold-glow-35), 0 2px 10px rgba(0,0,0,.35);
+}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.btn-primary {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, var(--btn-primary-top), var(--btn-primary-bottom));
+  font-weight: 600;
+}
+.btn-primary:hover:not(:disabled) {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 14px var(--gold-glow-40);
+}
+.btn-ghost {
+  background: var(--btn-ghost-bg);
+}
+.btn-small { font-size: .82rem; padding: .4em .8em; }
+.btn-danger { border-color: #8a3a34; color: #ffc9c3; }
+.btn-danger:hover:not(:disabled) { border-color: var(--death); }
+
+.file-label { display: inline-block; }
+
+/* ---------------- Title screen ---------------- */
+#title-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.title-card {
+  width: min(560px, 100%);
+  text-align: center;
+  border: 1px solid var(--tardis-line);
+  border-radius: 16px;
+  padding: 44px 36px 34px;
+  background:
+    linear-gradient(180deg, var(--card-grad-a), var(--card-grad-b));
+  box-shadow: 0 18px 60px rgba(0,0,0,.5), inset 0 0 60px var(--card-inset);
+}
+.title-cover {
+  width: 190px;
+  max-width: 55%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0 auto 22px;
+  display: block;
+  box-shadow: 0 8px 28px rgba(0,0,0,.55), 0 0 0 1px var(--tardis-line);
+}
+.title-kicker {
+  text-transform: uppercase;
+  letter-spacing: .22em;
+  font-size: .72rem;
+  color: var(--text-dim);
+}
+.title-name {
+  margin: .15em 0 0;
+  font-size: clamp(2.6rem, 9vw, 4rem);
+  letter-spacing: .12em;
+  color: var(--gold-bright);
+  text-shadow: 0 0 26px var(--gold-glow-35);
+}
+.title-sub {
+  font-variant: small-caps;
+  letter-spacing: .14em;
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  margin-bottom: 30px;
+}
+.title-progress { margin: 0 auto 26px; max-width: 360px; }
+.progress-bar {
+  height: 8px;
+  border: 1px solid var(--tardis-line);
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(0,0,0,.35);
+}
+#title-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  transition: width .3s;
+}
+.progress-text {
+  margin-top: 6px;
+  font-size: .8rem;
+  color: var(--text-dim);
+  letter-spacing: .08em;
+}
+.title-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  max-width: 280px;
+  margin: 0 auto;
+}
+.title-note { margin-top: 18px; font-size: .78rem; color: var(--text-dim); }
+
+/* ---------------- Chapter screen ---------------- */
+#chapter-screen {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chapter-topbar {
+  position: relative;
+  flex: 0 0 auto;
+  top: auto;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 14px 0;
+  border-bottom: 1px solid var(--tardis-line);
+  background: var(--topbar-bg);
+  backdrop-filter: blur(4px);
+}
+/* Primary top-bar row: Undo | section | (spacer) | mode | tree | home.
+   Never collapses on scroll (stage 3.5-C requirement). */
+.topbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topbar-spacer { flex: 1 1 auto; }
+.chapter-no {
+  font-variant: small-caps;
+  letter-spacing: .18em;
+  font-size: .85rem;
+  color: var(--gold-bright);
+  white-space: nowrap;
+}
+
+/* Segmented Summary | Original control. */
+.seg-control {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--tardis-line);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--seg-bg);
+}
+.seg-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: .82rem;
+  letter-spacing: .04em;
+  padding: 8px 14px;
+  min-height: 40px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--tardis-line); }
+.seg-btn:hover:not(:disabled) { color: var(--text); background: var(--hover-bg); }
+.seg-btn.seg-active {
+  color: var(--gold-bright);
+  background: var(--active-bg);
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+.seg-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* Large touch-target icon buttons with a text label (>=40px). */
+.tb-icon-btn {
+  appearance: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 46px;
+  min-height: 46px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.tb-icon-btn:hover {
+  color: var(--gold-bright);
+  background: var(--tag-bg);
+  border-color: var(--tardis-line);
+}
+.tb-icon-btn .tb-icon { width: 20px; height: 20px; display: block; }
+.tb-icon-btn .tb-label {
+  font-size: .62rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* Secondary stat row: read percentage + endings counter. */
+.topbar-stat-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+}
+.chapter-progress {
+  font-variant-numeric: tabular-nums;
+  font-size: .76rem;
+  letter-spacing: .06em;
+  color: var(--text-dim);
+}
+.endings-counter {
+  font-variant-numeric: tabular-nums;
+  font-size: .74rem;
+  letter-spacing: .05em;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+/* Thin, always-on progress hairline on the bottom edge of the top bar. */
+.topbar-progress-track {
+  height: 3px;
+  margin: 0 -14px;
+  background: rgba(255,255,255,.07);
+}
+.topbar-progress-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  transition: width .25s ease;
+}
+.topbar-right { display: flex; gap: 8px; flex: 0 0 auto; align-items: center; }
+
+/* Overflow menu for top-bar items the user moved out of the persistent row
+   in Settings. Anchored to the top-right of the chapter top bar. */
+.tbmore-menu {
+  position: absolute;
+  top: calc(100% - 2px);
+  right: 12px;
+  z-index: 40;
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  background: var(--panel-bg);
+  box-shadow: 0 16px 44px rgba(0,0,0,.6);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tbmore-menu[hidden] { display: none !important; }
+.tbmore-item[hidden] { display: none !important; }
+.tbmore-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: .85rem;
+  color: var(--text);
+}
+.tbmore-item .tbmore-val { color: var(--gold-bright); font-variant-numeric: tabular-nums; }
+button.tbmore-item {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+button.tbmore-item:hover { background: var(--hover-bg-strong); }
+.tbmore-seg { display: flex; gap: 6px; }
+.tbmore-seg .seg-btn { min-height: 34px; padding: 6px 12px; }
+
+.chapter-body {
+  width: min(var(--maxw), 100%);
+  margin: 0 auto;
+  padding: 26px 22px 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* choices dock: the flex column's last item, so it stays pinned to the
+   bottom-right regardless of how long the section text is; main scrolls. */
+.choices-dock {
+  flex: 0 0 auto;
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  padding: 12px 22px 18px;
+  background: linear-gradient(180deg,
+    transparent 0%, var(--fade-mid) 40%, var(--tardis-deep) 100%);
+}
+.choices-dock-inner {
+  width: min(var(--maxw), 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.choices-dock .choices { margin-top: 0; }
+.choices-dock .ending-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+  gap: 10px;
+}
+.mechanic-note { margin-bottom: 4px; }
+@media (max-width: 560px) {
+  .choices-dock { padding: 10px 14px 14px; }
+}
+
+.prose p { margin: 0 0 1.05em; }
+.prose p:last-child { margin-bottom: 0; }
+.prose em { color: var(--gold-bright); }
+
+.chapter-prompt {
+  margin: 26px 0 14px;
+  font-variant: small-caps;
+  letter-spacing: .14em;
+  color: var(--gold-bright);
+  font-size: 1.02rem;
+}
+
+/* ---------------- Choices ---------------- */
+.choices {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.choice-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  width: 100%;
+  padding: .8em 1.05em;
+  font-size: .98rem;
+  line-height: 1.45;
+}
+.choice-bullet {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--gold);
+}
+.choice-label { flex: 1; }
+.choice-target {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold-bright);
+  font-weight: 600;
+  letter-spacing: .08em;
+}
+.choice-btn.is-puzzle { border-color: var(--gold); }
+
+/* randomisers (dice / coin) */
+.mechanic-note {
+  margin-top: 20px;
+  color: var(--text-dim);
+  font-size: .9rem;
+}
+.randomiser {
+  margin: 18px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.randomiser .random-output {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--gold-bright);
+  min-width: 2.2em;
+  text-align: center;
+  letter-spacing: .06em;
+}
+.random-output.rolling { animation: rattle .12s linear infinite; }
+@keyframes rattle {
+  0% { transform: rotate(-8deg) scale(1.05); }
+  50% { transform: rotate(7deg) scale(.96); }
+  100% { transform: rotate(-8deg) scale(1.05); }
+}
+.manual-divider {
+  margin: 14px 0 2px;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  color: var(--text-dim);
+}
+
+/* ---------------- Endings ---------------- */
+.ending-banner {
+  margin: 26px 0 8px;
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  text-align: center;
+  font-variant: small-caps;
+  letter-spacing: .22em;
+  font-size: 1.05rem;
+  border: 1px solid;
+}
+.ending-banner.et-death  { color: #ffd6d2; border-color: var(--death); background: rgba(208,69,58,.14); }
+.ending-banner.et-bad    { color: #ffe2c2; border-color: var(--bad);   background: rgba(224,138,46,.14); }
+.ending-banner.et-neutral{ color: #d7dee5; border-color: var(--neutral);background: rgba(138,151,163,.14); }
+.ending-banner.et-good   { color: #d3f3dc; border-color: var(--good);  background: rgba(79,174,106,.14); }
+
+.ending-actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+/* ---------------- Modal ---------------- */
+.modal-backdrop[hidden], .toast[hidden] { display: none; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: var(--overlay);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 36px 18px;
+  overflow-y: auto;
+}
+.modal {
+  width: min(520px, 100%);
+  border: 1px solid var(--tardis-line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--panel-grad-a), var(--panel-grad-b));
+  padding: 24px 24px 20px;
+  box-shadow: 0 20px 70px rgba(0,0,0,.6);
+}
+.modal h2 { margin: 0 0 12px; color: var(--gold-bright); letter-spacing: .08em; }
+.settings-block {
+  border-top: 1px solid var(--line-soft);
+  padding: 14px 0;
+}
+.settings-block h3 {
+  margin: 0 0 8px;
+  font-size: .82rem;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  color: var(--text-dim);
+}
+.settings-note { font-size: .85rem; color: var(--text-dim); margin-bottom: 10px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.modal-close-row { justify-content: flex-end; margin-top: 14px; }
+.settings-message { margin-top: 10px; font-size: .85rem; min-height: 1.2em; color: var(--gold-bright); }
+.settings-message.error { color: #ff9b93; }
+
+/* Global reader settings: font-size stepper and top-bar item toggles. */
+.fontsize-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fontsize-step {
+  width: 40px;
+  min-height: 40px;
+  font-size: 1.2rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex: 0 0 auto;
+}
+.fontsize-input {
+  width: 84px;
+  min-height: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--menu-bg);
+  border: 1px solid var(--tardis-line);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.fontsize-unit { color: var(--text-dim); font-size: .85rem; }
+.fontsize-reset {
+  margin-left: auto;
+  min-height: 36px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tbcheck-list { display: flex; flex-direction: column; gap: 2px; }
+.tbcheck {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .92rem;
+}
+.tbcheck:hover { background: var(--hover-bg-soft); }
+.tbcheck input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  accent-color: var(--gold);
+}
+.tbcheck .tbcheck-hint { color: var(--text-dim); font-size: .76rem; }
+
+/* ---------------- Toast ---------------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 10px 20px;
+  border: 1px solid var(--gold);
+  border-radius: 99px;
+  background: var(--popup-bg);
+  color: var(--text);
+  font-size: .9rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+}
+
+/* ---------------- Jump-back chooser ---------------- */
+.jumpback-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 52vh;
+  overflow-y: auto;
+  margin: 12px 0;
+}
+.jumpback-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line-solid);
+}
+.jumpback-no {
+  flex: 0 0 auto;
+  color: var(--gold-bright);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.jumpback-sum {
+  color: var(--text-dim);
+  font-size: .86rem;
+  line-height: 1.35;
+}
+
+/* ---------------- Phone viewport ---------------- */
+@media (max-width: 560px) {
+  .chapter-body { padding: 22px 16px 50px; }
+  .title-card { padding: 34px 22px 26px; }
+  .chapter-topbar { padding: 7px 10px 0; }
+  .topbar-progress-track { margin: 0 -10px; }
+
+  /* Narrow phones cannot fit Undo + section + segmented control + Tree +
+     Home + More on one line without pushing buttons off-screen. Let the
+     primary row wrap and drop the segmented control onto its own full-width
+     second line; the icon buttons always stay visible on line one. */
+  .topbar-row { flex-wrap: wrap; row-gap: 6px; }
+  #mode-switch {
+    order: 20;
+    flex-basis: 100%;
+    width: 100%;
+  }
+  #mode-switch .seg-btn { flex: 1 1 0; }
+  .chapter-no-label { display: none; }
+
+  .tb-icon-btn { min-width: 44px; min-height: 44px; padding: 4px 6px; }
+  .endings-counter, .chapter-progress { font-size: .68rem; }
+  .btn-small { font-size: .78rem; padding: .38em .65em; }
+  .randomiser { gap: 12px; }
+}
+
+/* Book theme: era base plus this book's accent pair. Layout is untouched. */
+:root {
+  --tardis: #0b1116;
+  --tardis-deep: #070b0e;
+  --tardis-panel: #141d25;
+  --tardis-line: #2a3843;
+  --gold: #ff7a1c;
+  --gold-bright: #ffb066;
+  --text: #e9eef2;
+  --text-dim: #8ea1ad;
+
+  --tardis-glow: #412817;
+  --btn-top: #302824;
+  --btn-bottom: #1c1918;
+  --btn-primary-top: #854a21;
+  --btn-primary-bottom: #4c3323;
+  --btn-ghost-bg: rgba(20,29,37,0.58);
+  --gold-glow-12: rgba(255,122,28,0.12);
+  --gold-glow-35: rgba(255,122,28,0.35);
+  --gold-glow-40: rgba(255,122,28,0.4);
+  --gold-glow-70: rgba(255,176,102,0.7);
+  --gold-glow-80: rgba(255,176,102,0.8);
+  --card-grad-a: rgba(72,49,35,0.9);
+  --card-grad-b: rgba(17,15,15,0.94);
+  --card-inset: rgba(255,122,28,0.15);
+  --topbar-bg: rgba(42,31,24,0.94);
+  --seg-bg: rgba(13,19,24,0.55);
+  --hover-bg: rgba(255,122,28,0.2);
+  --hover-bg-strong: rgba(255,122,28,0.3);
+  --hover-bg-soft: rgba(255,122,28,0.16);
+  --active-bg: rgba(255,122,28,0.35);
+  --tag-bg: rgba(255,122,28,0.2);
+  --panel-bg: #251d18;
+  --panel-grad-a: #483123;
+  --panel-grad-b: #201b18;
+  --fade-mid: rgba(7,11,14,0.92);
+  --overlay: rgba(7,11,14,0.78);
+  --menu-bg: rgba(13,19,24,0.72);
+  --popup-bg: rgba(13,19,24,0.96);
+  --line-soft: rgba(42,56,67,0.5);
+  --line-solid: rgba(42,56,67,0.65);
+}
+body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #412817 0%, transparent 60%),
+    linear-gradient(180deg, var(--tardis) 0%, var(--tardis-deep) 100%);
+  background-attachment: fixed;
+}
+.title-links {
+  margin-top: 18px; display: flex; gap: 16px; flex-wrap: wrap;
+  font-size: .82rem; letter-spacing: .04em;
+}
+.title-links a {
+  color: var(--gold-bright); text-decoration: none;
+  border-bottom: 1px solid rgba(255,255,255,.28); padding-bottom: 2px;
+}
+.title-links a:hover { color: var(--text); border-bottom-color: var(--gold-bright); }
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== Title screen ===================== -->
+  <section id="title-screen" class="screen" hidden>
+    <div class="title-card">
+      <img id="title-cover" class="title-cover" alt="" hidden>
+      <div id="title-kicker" class="title-kicker">Interactive Gamebook</div>
+      <h1 id="title-name" class="title-name"></h1>
+      <div id="title-sub" class="title-sub"></div>
+      <div class="title-progress">
+        <div class="progress-bar"><div id="title-progress-fill"></div></div>
+        <div id="title-progress-text" class="progress-text">0.00% read</div>
+      </div>
+      <div class="title-actions">
+        <button id="btn-continue" class="btn btn-primary" data-i18n="continueWord" hidden>Continue</button>
+        <button id="btn-start" class="btn btn-primary" data-i18n="startNew">Start New</button>
+        <button id="btn-settings" class="btn btn-ghost" data-i18n="settingsWord">Settings</button>
+      </div>
+      <div id="title-save-note" class="title-note"></div><div class="title-links"><a href="../../index.html" data-i18n-html="backToShelf">&larr; Back to the shelf</a><a href="roadmap.html" data-i18n-html="fullRouteMap">Full route map &middot; full spoilers</a></div>
+    </div>
+  </section>
+
+  <!-- ===================== Chapter screen ===================== -->
+  <section id="chapter-screen" class="screen" hidden>
+    <header class="chapter-topbar">
+      <div class="topbar-row">
+        <div class="chapter-no" data-tbkey="section"><span class="chapter-no-label" data-i18n="sectionWord">Section </span><span id="chapter-num">000</span></div>
+        <div class="topbar-spacer"></div>
+
+        <div id="mode-switch" class="seg-control" data-tbkey="mode"
+             role="group" aria-label="Reading mode" data-i18n-aria="readingModeAria">
+          <button id="btn-mode-summary" type="button"
+                  class="seg-btn" aria-pressed="true" data-i18n="tbSummary">Summary</button>
+          <button id="btn-mode-original" type="button"
+                  class="seg-btn" aria-pressed="false" disabled
+                  title="Import the original text pack to enable this"
+                  data-i18n="tbOriginal" data-i18n-title="origTip">Original</button>
+        </div>
+
+        <button id="btn-tree" class="tb-icon-btn" type="button"
+                title="Open this book's route map" data-i18n-title="routeMapTip">
+          <svg class="tb-icon" viewBox="0 0 24 24" aria-hidden="true"
+               focusable="false"><path d="M12 3v5M12 8l-5 5M12 8l5 5M7 13v4M17 13v4M7 17v3M12 13v7M17 17v3"
+            fill="none" stroke="currentColor" stroke-width="1.7"
+            stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="tb-label" data-i18n="routeMapWord">Route map</span>
+        </button>
+        <button id="btn-home" class="tb-icon-btn" type="button"
+                title="Back to the shelf" data-tbkey="home">
+          <svg class="tb-icon" viewBox="0 0 24 24" aria-hidden="true"
+               focusable="false"><path d="M3.5 11.2L12 4l8.5 7.2M5.5 10v9.5h13V10"
+            fill="none" stroke="currentColor" stroke-width="1.7"
+            stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="tb-label" id="btn-home-label">Title</span>
+        </button>
+        <button id="btn-tbmore" class="tb-icon-btn" type="button"
+                title="More top bar items" data-i18n-title="moreTip" hidden>
+          <svg class="tb-icon" viewBox="0 0 24 24" aria-hidden="true"
+               focusable="false"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>
+          <span class="tb-label" data-i18n="moreWord">More</span>
+        </button>
+        <div id="tbmore-menu" class="tbmore-menu" hidden></div>
+      </div>
+      <div class="topbar-stat-row">
+        <span id="chapter-progress" class="chapter-progress" data-tbkey="progress"
+              title="Share of the book you have read" data-i18n-title="progressTip">0.00% read</span>
+        <span id="endings-counter" class="endings-counter" data-tbkey="endings"
+              title="Different endings you have reached" data-i18n-title="endingsTip">Endings found: 0</span>
+      </div>
+      <div class="topbar-progress-track" id="topbar-progress-track" data-tbkey="progress" aria-hidden="true">
+        <div id="topbar-progress-fill" class="topbar-progress-fill"></div>
+      </div>
+    </header>
+
+    <main class="chapter-body">
+      <article id="chapter-text" class="prose"></article>
+
+      <div id="ending-banner" class="ending-banner" hidden>
+        <span id="ending-banner-text"></span>
+      </div>
+    </main>
+
+    <div class="choices-dock">
+      <div class="choices-dock-inner">
+        <div id="mechanic-note" class="mechanic-note"></div>
+        <nav id="choices" class="choices"></nav>
+
+        <div id="ending-actions" class="ending-actions dock-actions">
+          <button id="btn-undo" class="btn btn-ghost" data-i18n="undoWord" data-i18n-title="undoTip" title="Undo the last move on this play line">Undo</button>
+          <button id="btn-ending-restart" class="btn btn-primary" hidden>Restart from 001</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Settings modal ===================== -->
+  <div id="settings-backdrop" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <h2 id="settings-title" data-i18n="settingsWord">Settings</h2>
+
+      <div class="settings-block">
+        <h3 data-i18n="fontSizeTitle">Reading font size</h3>
+        <div class="fontsize-row">
+          <button id="btn-font-dec" class="btn btn-ghost fontsize-step" type="button"
+                  aria-label="Decrease font size" data-i18n-aria="fontDecAria">&minus;</button>
+          <input id="font-size-input" class="fontsize-input" type="number"
+                 min="12" max="32" step="1" inputmode="numeric" value="16"
+                 aria-label="Reading font size in pixels" data-i18n-aria="fontInputAria">
+          <button id="btn-font-inc" class="btn btn-ghost fontsize-step" type="button"
+                  aria-label="Increase font size" data-i18n-aria="fontIncAria">+</button>
+          <span class="fontsize-unit">px</span>
+          <button id="btn-font-reset" class="btn btn-small btn-ghost fontsize-reset"
+                  type="button" data-i18n="resetWord">Reset</button>
+        </div>
+        <div class="settings-note" data-i18n="fontSizeNote">Applies to every book on this device. The reading text uses relative sizing, so 16&nbsp;px is the default.</div>
+      </div>
+
+      <div class="settings-block">
+        <h3 data-i18n="tbItemsTitle">Persistent top bar items</h3>
+        <div class="settings-note" data-i18n="tbItemsNote">Untick an item to move it into the top bar&rsquo;s &ldquo;More&rdquo; menu. Changes apply immediately and are remembered.</div>
+        <div class="tbcheck-list" id="tbcheck-list">
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="section" checked> <span data-i18n="tbcheckSection">Section number</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="progress" checked> <span data-i18n="tbcheckProgress">Reading progress &amp; bar</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="endings" checked> <span data-i18n="tbcheckEndings">Endings found counter</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="mode" checked> <span data-i18n="tbcheckMode">Summary / Original switch</span></label>
+          <label class="tbcheck"><input type="checkbox" data-tbcheck="home" checked> <span data-i18n="tbcheckHome">Shelf / Title button</span></label>
+        </div>
+      </div>
+
+      <div class="settings-block js-pack-block">
+        <h3 data-i18n="readingModeTitle">Reading mode</h3>
+        <div id="pack-status" class="settings-note">No original text pack loaded.</div>
+        <div class="settings-note" data-i18n="readingModeNote">Switch between Summary and Original any time using the segmented control in the top bar while reading.</div>
+        <label class="btn btn-small file-label js-standalone-only">
+          <span data-i18n="loadPack">Load text pack&hellip;</span>
+          <input id="file-pack" type="file" accept=".json,application/json" hidden>
+        </label>
+        <button id="btn-unload-pack" class="btn btn-small btn-danger js-standalone-only"
+                type="button" data-i18n="removePack" hidden>Remove text pack</button>
+      </div>
+
+      <div class="settings-block js-standalone-only">
+        <h3 data-i18n="saveTitle">Save</h3>
+        <div class="settings-note" data-i18n="saveNote">Progress is saved automatically in this browser, one save slot.</div>
+        <div class="btn-row">
+          <button id="btn-export" class="btn btn-small" data-i18n="exportSave">Export save&hellip;</button>
+          <label class="btn btn-small file-label">
+            <span data-i18n="importSave">Import save&hellip;</span>
+            <input id="file-save" type="file" accept=".json,application/json" hidden>
+          </label>
+          <button id="btn-clear" class="btn btn-small btn-danger" data-i18n="clearProgress">Clear all progress</button>
+          <button id="btn-reset-everything" class="btn btn-small btn-danger js-standalone-only" data-i18n="resetEverything">Reset everything (progress &amp; loaded pack)</button>
+        </div>
+      </div>
+
+      <div id="settings-message" class="settings-message"></div>
+
+      <div class="btn-row modal-close-row">
+        <button id="btn-settings-close" class="btn btn-primary" data-i18n="closeWord">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Jump-back chooser (Undo after a tree jump) ============ -->
+  <div id="jumpback-backdrop" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="jumpback-title">
+      <h2 id="jumpback-title" data-i18n="jumpbackTitle">Return to&hellip;</h2>
+      <p class="settings-note" data-i18n="jumpbackNote">
+        You reached this section from your story tree. More than one section
+        you have visited can lead here &mdash; choose which one to step back to.
+      </p>
+      <div id="jumpback-list" class="jumpback-list"></div>
+      <div class="btn-row modal-close-row">
+        <button id="btn-jumpback-cancel" class="btn btn-ghost" data-i18n="cancelWord">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+</div>
+
+<script>
+window.BOOK_DATA={"slug":"ctf-01-night-of-the-kraken","pack_kind":"ctf-01-night-of-the-kraken_text_pack","roadmap_url":"roadmap.html","book":"Doctor Who: Night of the Kraken","start":1,"count":150,"total_words":24351,"icon":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMiAxMiI+PGNpcmNsZSBjeD0iNiIgY3k9IjYiIHI9IjQiIGZpbGw9IiNmZmZmZmYiLz48L3N2Zz4=","meta":{"slug":"ctf-01-night-of-the-kraken","title":"Night of the Kraken","full_title":"Doctor Who: Night of the Kraken","subtitle":"Choose the Future","series":"Choose the Future","series_number":1,"authors":"Jonathan Green","publisher":"Penguin Books Ltd","release_date":"2016-04-29","cover":null,"kind":"gamebook"},"sections":{"1":{"p":null,"e":[[20,"choice","If you think the Doctor should stand his ground"],[75,"choice","If you think he should take cover as best he can"]],"en":null,"s":"The TARDIS lands on a windswept Cornish heath at dusk, where the Doctor identifies late eighteenth-century Earth. He notices an unlit lighthouse and a gallows, and then a horseman galloping straight towards him.","w":316},"2":{"p":null,"e":[[54,"choice","If you think he should approach the bar and order himself a drink first"],[84,"choice","If you think he should try to talk to some of the locals straight away"],[22,"choice","Alternatively, if the Doctor is already in possession of a map"]],"en":null,"s":"Inside the smoky Hispaniola inn, the Doctor silences the patrons, then notices a dark-haired barmaid with a weary, sorrowful face. He realises he must question a local to learn what troubles the moor.","w":237},"3":{"p":null,"e":[[97,"choice","If you think the Doctor should turn and face whatever is coming through the door"],[79,"choice","If you think he should get away from this place as fast as he can"]],"en":null,"s":"The Doctor's sonic screwdriver sparks the rider's wrist, revealing a motionless android beneath the hat. Recognising the soliton gas and machine men, he suspects a Terileptil, just as a hatch opens behind him.","w":138},"4":{"p":null,"e":[[21,"choice","Continue to section 21"],[62,"choice","If you think he should ask ‘Why are you here?’"]],"en":null,"s":"The Doctor announces himself as the last Time Lord and demands answers from a silent man. He notes the anachronistic technology and insists that helping people in trouble is his calling.","w":132},"5":{"p":null,"e":[[19,"choice","If you think the Doctor should refuse to let her accompany him"],[24,"choice","If you think he should agree to let her join him"]],"en":null,"s":"Tearful Bess insists she saw her hanged lover Jem walking after his execution. The Doctor takes her hands, learns her name, and she leads him out the back toward the village of Bosmouth, declaring she will join him.","w":197},"6":{"p":null,"e":[[125,"choice","If you think the Doctor should scan the zombie using his sonic screwdriver"],[64,"choice","If you think he should turn and run in the opposite direction as fast as he can"]],"en":null,"s":"Heading back to the TARDIS at a run, the Doctor is stopped by a shambling cadaver standing between him and the blue box. Moonlight exposes its grey, peeling skin and noose, and he greets it with a flippant remark.","w":140},"7":{"p":null,"e":[[21,"choice","If you think the Doctor should ask, ‘Who are you?’"],[62,"choice","If you think he should ask, ‘Why are you here?’"],[82,"choice","If you think he should ask, ‘How did you come by all this alien tech?’"]],"en":null,"s":"The Doctor accuses the smuggler of handling spacecraft components and asks whether the salvaged beacon is meant for the zombies. The man levels a Fengarian blaster and demands his identity; the Doctor offers his name and a question.","w":123},"8":{"p":null,"e":[[48,"choice","If you think the Doctor should speak to the shambling corpse"],[64,"choice","If you think he should turn and run for it"]],"en":null,"s":"A rotting figure emerges between the Doctor and the TARDIS under the moon, its worm-eaten flesh and frayed noose plainly visible. Startled, the Doctor halts out of reach and exclaims that he did not expect this.","w":124},"9":{"p":null,"e":[[146,"forced",""]],"en":null,"s":"Crouching low, the Doctor creeps past the distracted smuggler toward an open passageway. His jacket strikes a metal tube, the clang gives him away, and he sprints off down the tunnel with great speed.","w":112},"10":{"p":null,"e":[[147,"forced",""]],"en":null,"s":"The Doctor and Ravenwood trade barbs until Bess scolds them like squabbling brothers. She reminds the Doctor their plan requires three people, then pleads with the smuggler, who agrees to assist her.","w":151},"11":{"p":null,"e":[[122,"choice","Continue to section 122"],[26,"choice","If you think he should just stick to the plan"]],"en":null,"s":"Safe inside the church, the Doctor radios Ravenwood and learns the zombie control unit lies in a storeroom below. Facing the molecular fringe animation device, he realises the roaming undead could serve as his army.","w":178},"12":{"p":null,"e":[[81,"choice","If the Doctor has met Bess the barmaid"],[91,"choice","If not"]],"en":null,"s":"Reaching Bosmouth's quay, the Doctor and the smuggler find squid-like Kraa'Kn attacking villagers. The smuggler admits responsibility, orders the Doctor to duck, then kills a creature, prompting the Doctor's protest against more killing.","w":258},"13":{"p":null,"e":[[37,"choice","If you think the Doctor should go to the village"],[67,"choice","If you think he should go to the lighthouse"]],"en":null,"s":"On the beach, Bess knocks the armed smuggler down with driftwood before he can fire. The Doctor confirms the man will live, throws the blaster into the sea, and then spots strange churning water, weighing vantage points.","w":196},"14":{"p":null,"e":[[59,"forced",""]],"en":null,"s":"After mocking the rider's threat, the Doctor senses something behind him and turns to a corpse-like figure with missing nose and grave dirt. Its bony grip traps him, a blow strikes his head, and everything goes dark.","w":192},"15":{"p":null,"e":[[67,"forced",""]],"en":null,"s":"The Doctor hints that the lighthouse can dispel the shadow over Bosmouth, teasing Bess with a modern pop-culture reference she cannot place. Baffled but intrigued, she follows him as he urges her to come along.","w":96},"16":{"p":null,"e":[[43,"choice","If you think the Doctor should chase after the fleeing piece of parchment"],[86,"choice","If you think he should ignore it"]],"en":null,"s":"The Doctor tries to keep pace with the mounted rider, but loses him when the man turns toward the isolated church. Near the graveyard wall, he hears paper rustling and notices parchment fluttering over the grass.","w":96},"17":{"p":null,"e":[[89,"choice","If you think the Doctor should ask her about the gallows he saw on the moor"],[47,"choice","If you want him to ask her about the mysterious rider"],[69,"choice","If you want him to find out about the lighthouse"]],"en":null,"s":"At the Hispaniola bar, the Doctor asks for tea but is offered only ale or water, and the murky tankard puts him off drinking. His clumsy remark about the weather draws a terse reply that worse troubles exist.","w":97},"18":{"p":null,"e":[[10,"choice","If the name Ravenwood means anything to the Doctor"],[135,"choice","If not"]],"en":null,"s":"Bess points out the distant wreck from the lantern room, and the Doctor's remark about perspective suddenly sparks a plan requiring three people. A cloaked figure then enters through the stairwell, startling them both.","w":122},"19":{"p":null,"e":[[96,"choice","If you think the Doctor should go to the village of Bosmouth"],[131,"choice","If you think he should take the coastal cliff path"]],"en":null,"s":"The Doctor urges Bess to bolt the inn and admit nobody until he returns, suggesting she warm herself by the fire. He then heads back across the dark moor, listening for shuffling feet, unsure where to go next.","w":148},"20":{"p":null,"e":[[56,"choice","If you think the Doctor should run for cover"],[40,"choice","If you think he should try to keep the rider talking"]],"en":null,"s":"The Doctor calls to the black-clad horseman, who keeps his face hidden and levels a flintlock pistol. The rider challenges him, suspects the TARDIS is his, and warns him to stay back when he steps closer.","w":194},"21":{"p":null,"e":[[112,"choice","If you think the Doctor should agree to help Ravenwood anyway"],[42,"choice","If you think he should refuse to help the man"]],"en":null,"s":"The rider finally lowers his gun and calls himself Ravenwood, a name the Doctor treats as false. Ravenwood cites rumours of the Doctor from far-off places and asks for help, but the earlier blaster makes the Doctor wary.","w":160},"22":{"p":null,"e":[[84,"choice","If you think the Doctor should now try talking to some of the locals"],[107,"choice","If you think it best that he leaves the Hispaniola Inn"]],"en":null,"s":"Comparing his parchment map with the inn's layout, the Doctor aligns the drawn fireplace to a wall nook and finds a loosened brick. He removes it and retrieves a large iron key from the hiding hole.","w":177},"23":{"p":null,"e":[[116,"choice","Continue to section 116"],[98,"choice","If you think he should keep running towards the inn"]],"en":null,"s":"While fleeing the pistol-wielding rider, the Doctor spots a walled church and, on the hilltop, a lit coaching inn. He weighs which building might shelter him best from his pursuer.","w":75},"24":{"p":null,"e":[[37,"choice","If you think they should go to the village"],[67,"choice","If you think they should go to the lighthouse"]],"en":null,"s":"The Doctor and Bess slip out of the inn unnoticed, leaving both the drinkers and the waiting undead behind. He asks the barmaid whether they should head for the village or the lighthouse.","w":110},"25":{"p":null,"e":[[38,"choice","If you think the Doctor should go with them"],[5,"choice","If you think he should join the barmaid at the back of the room"]],"en":null,"s":"Leaping onto a table, the Doctor tells the inn's customers that the dead are besieging the living and asks where their families are. Stirred into action, a burly man leads the crowd out toward Bosmouth.","w":168},"26":{"p":null,"e":[[35,"forced",""]],"en":null,"s":"The Doctor stops himself from getting distracted, switches off the molecular fringe animation unit, and exits the church. Finding the outside empty, he sets off running again with relief.","w":84},"27":{"p":null,"e":[[59,"forced",""]],"en":null,"s":"Trying to escape through the main door, the Doctor is encircled by the ungainly but relentless undead. His appeal to their better natures fails, grave-dirt nails claw him, and a blow to the skull ends his struggle.","w":109},"28":{"p":null,"e":[[9,"choice","If you think the Doctor should leave now, while the man is distracted"],[7,"choice","If you think he should challenge the man"]],"en":null,"s":"The Doctor examines a table of impossible devices, including a Sontaran cloaking component, a Vintaric crystal matrix, and something seemingly Zygon. Meanwhile the man beside it concentrates on assembling or repairing an object.","w":84},"29":{"p":null,"e":[[126,"forced",""]],"en":null,"s":"The Terileptil recalls its crashed craft, centuries of hibernation beneath a later temple, and awakening when smugglers entered. Deeming the Doctor an enemy, it fires a purple energy bolt that drops him unconscious.","w":301},"30":{"p":null,"e":[[53,"forced",""]],"en":null,"s":"Ravenwood admits the lighthouse and the sea below are his doing, and the Doctor refuses to help him personally. He will still aid Bosmouth's people, noting the smuggler's off-world goods may prove useful.","w":180},"31":{"p":null,"e":[[55,"choice","If you think the Doctor should go towards the grounded ship"],[96,"choice","If you want him to go towards the village"]],"en":null,"s":"When the smuggler fires, the Doctor runs across the beach rather than surrender, the near miss only speeding his flight. He considers hiding in the grounded wreck or losing himself in the village's narrow alleys.","w":96},"32":{"p":null,"e":[[44,"choice","If you think the Doctor should explore the wrecked ship"],[63,"choice","If you think he should investigate the disturbance out in the bay"]],"en":null,"s":"Climbing down a steep cliff track, the Doctor reaches the sands and approaches the sea, drawn to the stranded vessel. Beyond the shoreline, the black waves keep frothing in a way that refuses to calm.","w":71},"33":{"p":null,"e":[[52,"forced",""]],"en":null,"s":"The Doctor confronts Ravenwood, who asks for help to save Bosmouth and admits he has been tracking him. The Time Lord agrees to aid villagers and Kraa'Kn alike, then follows the smuggler toward the lighthouse.","w":187},"34":{"p":null,"e":[[4,"choice","If you think the Doctor should reply, ‘I am the Doctor!’"],[51,"choice","If you think he should take out his psychic paper and try to fool the man"]],"en":null,"s":"Following a smugglers' tunnel, the Doctor enters an underground storeroom of barrels and crates and sees futuristic tech on a makeshift table. A dark-clothed man with a ponytail spins around, aims a Fengarian blaster, and demands his identity.","w":245},"35":{"p":null,"e":[[46,"forced",""]],"en":null,"s":"Linked by walkie-talkie, the Doctor, Bess, and Ravenwood execute their lighthouse scheme as the TARDIS beams blue light at the mirror. The cannon's golden ray drives squid-men into the wreck, which then shrinks until it vanishes.","w":303},"36":{"p":null,"e":[[13,"choice","If the Doctor has met Bess the barmaid"],[31,"choice","If not"]],"en":null,"s":"The Doctor outruns a stiffening robot through tunnels and emerges from a sea cave onto the shore. Village lights, the unlit lighthouse, and a wreck lie before him until the smuggler reappears and levels his blaster.","w":231},"37":{"p":null,"e":[[57,"choice","If you think the Doctor should insist that Bess goes with him"],[131,"choice","If you think he should leave her behind and carry on alone"]],"en":null,"s":"At Bosmouth harbour, the Doctor and Bess watch squid-like spawn attack the villagers and hear that legend has become real. The Doctor calls it a mass spawning, then hurries away, while Bess insists on staying to help.","w":312},"38":{"p":null,"e":[[50,"choice","If you think the Doctor should lead the mob towards the village of Bosmouth"],[131,"choice","If you think he should leave the mob and head towards the lighthouse along the coast"]],"en":null,"s":"The Doctor joins the inn's furious volunteers against a larger undead horde and urges them on. He identifies the signs of molecular fringe animation and resolves that only action will reveal who controls it.","w":102},"39":{"p":null,"e":[[58,"choice","If you think the Doctor should save the Kraa’Kn"],[138,"choice","If you think he should save the people of Bosmouth"]],"en":null,"s":"Using a solar cannon, a power cell, and teleport parts, the Doctor assembles a device under Bess's anxious gaze. He aligns it with the lighthouse mirror and faces a dilemma: should he save the humans or the Kraa'Kn?","w":124},"40":{"p":null,"e":[[6,"choice","If you think the Doctor should take the stranger’s advice and leave while he still can"],[14,"choice","If you think he shouldn’t risk turning his back on the stranger"]],"en":null,"s":"The black-clad rider rejects the Doctor's friendly chatter, accusing him of trying to trick him and claiming he is already too late. He warns the Time Lord to leave the place and never return.","w":206},"41":{"p":null,"e":[[4,"choice","If you think the Doctor should say, ‘I am the Doctor!’"],[77,"choice","If you think he should take out his psychic paper and try to dupe the smuggler"]],"en":null,"s":"Springing to his feet, the Doctor declares that Cornish smugglers should not possess alien hardware. The man grabs a device from the table, revealing a Fengarian blaster and an intensely hostile expression.","w":82},"42":{"p":null,"e":[[108,"forced",""]],"en":null,"s":"The Doctor angrily refuses to assist a man who just aimed a laser blaster at him from close range. Ravenwood accepts the point and evidently sets the weapon aside.","w":52},"43":{"p":null,"e":[[130,"forced",""]],"en":null,"s":"The Doctor snatches the windblown parchment and finds a hand-drawn floor plan marking a fireplace with an X. Wondering which building it depicts, he glances at the inn on the ridge and continues on his way.","w":146},"44":{"p":null,"e":[[76,"forced",""]],"en":null,"s":"Through a torn hull, the Doctor enters the wreck's empty cargo hold and hears a sucking sound behind him. A squid-headed, green-grey humanoid reaches for him, and he cries out before sprinting back to the beach.","w":220},"45":{"p":null,"e":[[5,"choice","If you think the Doctor should follow the barmaid"],[25,"choice","If you think he should try to rally the people to help him deal with the undead mob"]],"en":null,"s":"Opening the inn door, the Doctor finds a pack of decomposing corpses waiting with outstretched hands. As patrons crowd the windows, the barmaid signals him to escape through the back.","w":138},"46":{"p":null,"e":[[120,"forced",""]],"en":null,"s":"At sunrise, the Doctor holds a bottled, miniaturised wreck and explains the dimensional trick behind it. He plans to release the Kraa'Kn on a quiet world, while Ravenwood chooses to remain near Bess as they say farewell.","w":280},"47":{"p":null,"e":[[69,"choice","If you think the Doctor should ask Bess about the lighthouse"],[89,"choice","If you think he should ask about the gallows"],[109,"choice","If you think he should talk to someone else"],[107,"choice","If you think he should leave the inn"]],"en":null,"s":"The barmaid speculates that the mysterious rider may be a smuggler dodging taxes along the coast. She leans close and whispers that hidden tunnels are said to run beneath the moors.","w":75},"48":{"p":null,"e":[[64,"choice","If you think the Doctor should run for it"],[125,"choice","If you think he should use his sonic screwdriver to scan the zombie"]],"en":null,"s":"The Doctor greets the shambling corpse with cheerful small talk about the weather, but receives only a foul-smelling exhale. He then acknowledges that the figure is plainly a zombie.","w":55},"49":{"p":null,"e":[[137,"choice","If you think the Doctor should stop the Terileptil"],[102,"choice","If you think he should stop the android"]],"en":null,"s":"At the lighthouse summit, the Doctor finds the Terileptil wiring a distress signal and an undisguised android closing in. Knowing he can stop only one of them, he faces an immediate choice.","w":210},"50":{"p":null,"e":[[80,"choice","If you think the Doctor should head in the direction of the scream"],[131,"choice","Continue to section 131"]],"en":null,"s":"Leading the inn's mob into Bosmouth, the Doctor finds villagers battling tall squid-headed creatures and the crowd joins in. A lone scream makes him weigh saving one person against defending the whole village.","w":223},"51":{"p":null,"e":[[71,"choice","If you think the Doctor should use his sonic screwdriver to save himself"],[111,"choice","If you think he should just run for it"]],"en":null,"s":"When the Doctor flashes his psychic paper, the smuggler mistakes him for a Shadow Proclamation Time Agent and fires. The shot misses, he blames a misaligned focusing crystal, and prepares to shoot again.","w":112},"52":{"p":null,"e":[[53,"forced",""]],"en":null,"s":"Ravenwood reveals he acquired a Firekind solar pulse cannon and proposes using the lighthouse mirror to boil the sea and destroy the Kraa'Kn. The Doctor objects that the plan kills everything, but the smuggler insists the crisis must end.","w":144},"53":{"p":null,"e":[[133,"forced",""]],"en":null,"s":"The Doctor insists the operation proceed his way or not at all, and Ravenwood yields. The smuggler then leads him into the lighthouse, where crates of impossible technology fill the base and lantern room.","w":161},"54":{"p":null,"e":[[45,"forced",""]],"en":null,"s":"The barmaid pours the Doctor ale and tearfully reveals the walking corpse outside was her beloved. His blunt response silences the room, a customer orders him out, and he offers awkward condolences before leaving.","w":171},"55":{"p":null,"e":[[76,"forced",""]],"en":null,"s":"Hiding from the smuggler inside the wreck, the Doctor hears a slurping sound and turns to a half-octopus creature reaching for him. He cries out and races back onto the beach to escape its clutches.","w":142},"56":{"p":null,"e":[[23,"choice","If you want the Doctor to change direction and head towards the building"],[8,"choice","If you want him to keep heading towards the TARDIS"]],"en":null,"s":"Fleeing the rider, the Doctor recognises the shot as an alien energy weapon when grass bursts into flame beside him. He then spots a lone lit inn silhouetted on the dark horizon and continues toward his TARDIS.","w":174},"57":{"p":null,"e":[[15,"choice","If you think the Doctor should keep trying to persuade Bess to go with him"],[70,"choice","If you think he should get moving before the squid-men catch them"]],"en":null,"s":"Bess refuses to abandon Bosmouth, and the Doctor argues that retreating is the only way he can save it. He jokes about calamari, but the barmaid remains determined to stay and fight.","w":105},"58":{"p":null,"e":[[73,"choice","Continue to section 73"],[99,"choice","If you think he should deal with them both at the same time"]],"en":null,"s":"Leaving Bess at the lighthouse, the Doctor moves the TARDIS to the beach and outlines a plan to lure the spawn with a sonic pulse, shrink them, and carry them away. He then wonders what to do about their mother.","w":149},"59":{"p":null,"e":[[41,"choice","If you think the Doctor should challenge the man"],[28,"choice","If you think he should remain silent and continue to observe the man"],[9,"choice","If you think he should try to sneak out of the chamber unseen"]],"en":null,"s":"The Doctor wakes on the floor of a damp, windowless storeroom with his hands free and his face unchanged. Across the chamber stands a caped man with a ponytail, his back turned beside a makeshift table.","w":166},"60":{"p":null,"e":[[35,"forced",""]],"en":null,"s":"Leaving the undead behind, the Doctor reaches the rocky coastal road and heads in the direction of the TARDIS. He hopes to loop around and avoid another encounter with the walking corpses.","w":42},"61":{"p":null,"e":[[79,"choice","If you think the Doctor should get out of there as fast as he can"],[105,"choice","If you think he should stand firm before the alien"]],"en":null,"s":"The Doctor strikes the palm-reader, opening a hatch into a chamber filled with murky green mist. There he confronts a reptilian, fish-like humanoid and identifies it as a Terileptil.","w":99},"62":{"p":null,"e":[[92,"choice","If you think the Doctor should help Ravenwood anyway"],[108,"choice","If you think he should refuse to help the man"]],"en":null,"s":"Ravenwood confesses he chased the Kraa'Kn to Earth, hoping to sell its spawn as biological weapons to alien warlords. His half-built beacon has failed, and the Doctor calls him an idiot while weighing whether to help.","w":290},"63":{"p":null,"e":[[76,"choice","If you think he should run to the village"],[131,"choice","If you think he should head for the lighthouse"]],"en":null,"s":"Walking to the water's edge, the Doctor sees a frothing patch and then a glistening dome break the surface. The sight recalls the Sea Devils and fills him with dread as he considers how to warn the locals.","w":219},"64":{"p":null,"e":[[132,"choice","If you think the Doctor should now hide behind one of the headstones in the graveyard"],[144,"choice","If you think he should seek sanctuary inside the church"],[93,"choice","Continue to section 93"]],"en":null,"s":"The Doctor arrives at a walled churchyard of crumbling graves, unsure whether the zombie or the rider still trails him. He enters the holy ground hoping for shelter, recalling that such ground once deterred Haemovores.","w":118},"65":{"p":null,"e":[[83,"forced",""]],"en":null,"s":"The Doctor plants the beacon inside the wreck and watches squid-men flock into its hold before climbing back up. A lighthouse beam then sets the ship ablaze, trapping the spawn, and he bellows Ravenwood's name in fury.","w":216},"66":{"p":null,"e":[[59,"forced",""]],"en":null,"s":"A masked clockwork figure in a frock coat advances on the Doctor with a steady ticking, ignoring his remarks. When the Doctor tries to reason with it, the machine seizes him in a crushing grip and he blacks out.","w":312},"67":{"p":null,"e":[[134,"forced",""]],"en":null,"s":"Running along the clifftop, Bess and the Doctor look down on Dead Man's Bay and see a huge tentacle rise from the foam. He identifies a Kraa'Kn brood-mother and explains its spawn's use as weapons.","w":165},"68":{"p":null,"e":[],"en":"neutral","s":"Outside the TARDIS, Bess asks to travel with the Doctor, but he refuses, calling her too ruthless to be his companion. She says she regrets nothing, he answers that he forever will, and the story ends as he departs alone.","w":266},"69":{"p":null,"e":[[47,"choice","If you think the Doctor should ask the young woman about the mysterious rider"],[89,"choice","If you think he should ask her about the gallows"],[109,"choice","If you think he should talk to someone else"],[107,"choice","If you think he should leave the inn"]],"en":null,"s":"The Doctor asks why the lighthouse stands unlit on such a windy night. The barmaid explains that the place was abandoned after talk of ghosts and walking corpses frightened everyone away.","w":43},"70":{"p":null,"e":[[95,"choice","If the name Ravenwood means anything to the Doctor"],[33,"choice","If not"]],"en":null,"s":"Marching off up the slipway, the Doctor mutters an insult, then a pistol shot that sounds alien makes him turn. A caped, ponytailed man in riding boots steps out from the shadows of a narrow alley.","w":110},"71":{"p":null,"e":[[21,"choice","If you think the Doctor should ask, ‘Who are you?’"],[62,"choice","If you think he should ask, ‘Why are you here?’"]],"en":null,"s":"The Doctor uses the sonic to disrupt the blaster's power flow, leaving the weapon sparking but unable to fire. Under his stern glare, the irritated smuggler eventually agrees to start over.","w":78},"72":{"p":null,"e":[[144,"choice","If you think the Doctor should enter the church and boldly face whatever lies within"],[132,"choice","If you think he should hide among the headstones from the shambling zombie"]],"en":null,"s":"Escaping the zombie's grasp, the Doctor heads for the church's dark wooden door. A sudden worry strikes him that more undead may be waiting inside, perhaps the transformed locals.","w":51},"73":{"p":null,"e":[[141,"forced",""]],"en":null,"s":"The Doctor triggers a sonic pulse, and the TARDIS lamp throbs while figures approach from both village and sea. Recognising the tentacled Kraa'Kn, he steps back inside and the blue box fades away.","w":135},"74":{"p":null,"e":[[106,"choice","If you think the Doctor should keep to the path"],[94,"choice","If you think he should take a more direct route straight across the moors"]],"en":null,"s":"The Doctor and Ravenwood agree to reunite outside the lighthouse, then split, the smuggler carrying the beacon to the beach. Running toward the TARDIS, the Doctor must choose the coastal path or the darker moor.","w":95},"75":{"p":null,"e":[[87,"choice","If you think the Doctor should reveal himself and approach the stranger"],[101,"choice","If you think the Doctor should stay where he is and see what the stranger does next"]],"en":null,"s":"Trusting instincts honed over millennia, the Doctor hides in long grass and watches the lanternless rider halt before the TARDIS. He sees the man dismount, inspect the blue box, and attempt its door.","w":119},"76":{"p":null,"e":[[139,"forced",""]],"en":null,"s":"Running toward Bosmouth, the Doctor sees a dozen tentacled squid-men pour from the sea. Then several tree-thick tentacles uncoil behind them, and he groans at the arrival of a Kraa'Kn brood-mother.","w":107},"77":{"p":null,"e":[[71,"choice","If you think the Doctor should use his sonic screwdriver to save himself"],[113,"choice","If you think he should just run for it"]],"en":null,"s":"Flashing the psychic paper, the Doctor is taken for a Shadow Proclamation agent, and the smuggler fires rather than surrender. The beam grazes him, and the man blames his weapon's crystal before aiming once more.","w":117},"78":{"p":null,"e":[[142,"choice","If the Doctor has already visited the Hispaniola Inn"],[103,"choice","If not"]],"en":null,"s":"The Doctor climbs the spiral stone staircase two steps at a time and pauses outside a narrow door. After listening for any sound beyond, he throws it open and bursts back into the church.","w":88},"79":{"p":null,"e":[[49,"forced",""]],"en":null,"s":"Following a steep smugglers' tunnel, the Doctor reaches a sea cave at high tide and edges along a slippery ledge. A giant Kraken rises, but his sonic screwdriver drives it back, and he escapes to see the lighthouse newly lit.","w":311},"80":{"p":null,"e":[[67,"forced",""]],"en":null,"s":"The Doctor finds two squid-men cornering Bess against a house and drives them off with a shrill sonic burst. He introduces himself, and she gives her name before he tells her to stay close if she wants to survive.","w":188},"81":{"p":null,"e":[[129,"forced",""]],"en":null,"s":"Following a voice, the Doctor and Ravenwood find Kraa'Kn pinning Bess to a wall, and Ravenwood shoots both creatures dead. The Doctor protests the killing, but the smuggler simply introduces himself to the shaken barmaid.","w":260},"82":{"p":null,"e":[[21,"choice","If you think the Doctor should ask once more, ‘Who are you?’"],[62,"choice","If you think he should ask, ‘Why are you here?’"]],"en":null,"s":"The Doctor presses the man about his hoard of alien goods and concludes he is a smuggler. The stranger turns the questions back, asking whether the Doctor is following him, which the Time Lord denies.","w":105},"83":{"p":null,"e":[],"en":"neutral","s":"Ravenwood claims the problem is solved, then proposes a partnership called Galactic Exterminators. The Doctor rejects him coldly, noting the coast is safe but a species is lost, and departs without farewell as the story ends.","w":216},"84":{"p":null,"e":[[54,"choice","If you think the Doctor should talk to the young woman behind the bar"],[104,"choice","If you want him to join the group of men at their table"],[124,"choice","If you think he should talk to the old man sitting by the fire"]],"en":null,"s":"The Doctor notices two groups in the inn: pipe-smoking men at a central table who eye him with suspicion, and a gaunt old man alone by the fireplace, muttering into his ale.","w":80},"85":{"p":null,"e":[[72,"choice","If you think the Doctor should try to run for the safety of the church"],[125,"choice","Continue to section 125"]],"en":null,"s":"The Doctor asks the shambling corpse whether it knows about the zombies and the stranger with out-of-era weapons. It answers only with a dreadful moan, and he concludes that it is clearly undead.","w":81},"86":{"p":null,"e":[[59,"forced",""]],"en":null,"s":"Entering the neglected churchyard, the Doctor finds an abandoned church and a lit inn, then is encircled by rotting zombies. A hidden voice claims responsibility for them, and a blow to his head knocks him out.","w":263},"87":{"p":null,"e":[[23,"choice","If you want the Doctor to head towards the building"],[8,"choice","If you want him to keep heading towards the TARDIS"]],"en":null,"s":"The Doctor strolls back toward the TARDIS and chats with the rider, whose flintlock fires a red energy bolt instead of gunpowder. The burning grass sends him fleeing across the moor, where he spots a distant lit building.","w":252},"88":{"p":null,"e":[[149,"forced",""]],"en":null,"s":"After accidentally pressing a red button, the Doctor rambles about phoning himself and instead triggers an emergency landing. The Cloister Bell tolls, the TARDIS throws him across the room, and he feels a troubling sense of deja vu.","w":185},"89":{"p":null,"e":[[107,"forced",""]],"en":null,"s":"The Doctor asks the barmaid about the gallows and learns her true love was hanged for stealing. Her grief turns the conversation frosty, and he awkwardly apologises before heading for the door.","w":115},"90":{"p":null,"e":[[100,"choice","If the Doctor has a large iron key"],[34,"choice","If not"]],"en":null,"s":"Inside the abandoned church, the Doctor opens a narrow door and finds a spiral stair descending into the earth. Carrying a lantern, he follows a brick tunnel until a sturdy wooden door blocks his path, locked.","w":231},"91":{"p":null,"e":[[52,"choice","If you think the Doctor should focus on the bigger picture and go with Ravenwood"],[128,"choice","If you think he should ignore Ravenwood and follow the scream"]],"en":null,"s":"A scream rings out, and Ravenwood insists they must ignore it and deal with the Kraa'Kn. The Doctor angrily rejects that anyone is unimportant, but the smuggler urges him to follow regardless.","w":103},"92":{"p":null,"e":[[112,"forced",""]],"en":null,"s":"The Doctor agrees to help for the villagers' and the Kraa'Kn's sake, then repairs Ravenwood's failed lure. Their work produces a pudding-bowl-sized sonic beacon shaped like a barnacle, and the smuggler declares they are ready.","w":128},"93":{"p":null,"e":[[144,"choice","If you think the Doctor should seek shelter inside the church"],[132,"choice","Continue to section 132"]],"en":null,"s":"At the churchyard gate, the Doctor taunts the hanged zombie to cross the boundary and warns it may burst into flames. The corpse ignores him and keeps advancing, forcing him to announce a different plan.","w":114},"94":{"p":null,"e":[[83,"forced",""]],"en":null,"s":"Moonlight reveals a zombie pack blocking the Doctor's route to the TARDIS, forcing him to circle back. Then a lighthouse beam ignites the wreck, and the trapped spawn squeal as Ravenwood's pre-set trap springs.","w":182},"95":{"p":null,"e":[[52,"forced",""]],"en":null,"s":"Ravenwood admits he deliberately sought the Doctor and asks for assistance. The Time Lord refuses to aid him personally but agrees to help Bosmouth's people, and the smuggler leads him toward the lighthouse.","w":131},"96":{"p":null,"e":[[32,"choice","Continue to section 32"],[131,"choice","If you think he should change tack and head for the lighthouse"]],"en":null,"s":"Descending toward Bosmouth, the Doctor notices the harbour frothing more violently than the weather explains. He also sees a lantern-like light moving along the path near the lighthouse and murmurs that something is underway.","w":94},"97":{"p":null,"e":[[143,"choice","If you think the Doctor should respond with a thinly veiled threat"],[29,"choice","If you want him to offer the creature aid"]],"en":null,"s":"A scaled, fish-like Terileptil emerges from the hatch and demands the Doctor's identity and purpose. The Doctor proudly names himself, hints at past encounters, and turns the questions back on the alien.","w":140},"98":{"p":null,"e":[[17,"choice","If you think the Doctor should walk up to the bar and order a drink first"],[109,"choice","If you think he should just talk to one of the locals"],[107,"choice","If you think he should simply leave"]],"en":null,"s":"Pushing into the Hispaniola, the Doctor is met by tobacco smoke and a roomful of wary locals who soon resume their drinks. He knows that learning what is happening will require conversation with someone present.","w":257},"99":{"p":null,"e":[[150,"forced",""]],"en":null,"s":"The Doctor activates the TARDIS's sonic pulse beacon and watches the Kraa'Kn spawn approach from shore and sea. As the blue box phases, the beach warps and the creatures and their mother's tentacles disappear.","w":197},"100":{"p":null,"e":[[3,"choice","If you think the Doctor should use his sonic screwdriver to block the beam emitter"],[61,"choice","If you think he should try to open the metal hatch and take cover on the other side"]],"en":null,"s":"Using the key, the Doctor enters a crystal-lit chamber holding a molecular fringe unit and a green soliton gas flask. The rider appears and fires a purple beam, prompting the Doctor's warning about the gas's flammability.","w":255},"101":{"p":null,"e":[[116,"choice","If you think the Doctor should head towards the church"],[98,"choice","If you think he should visit the coaching inn"],[16,"choice","If you think he should set off after the mysterious rider"]],"en":null,"s":"Watching the rider fail to enter the TARDIS and ride off, the Doctor notes the disguised alien blaster in his belt. He then surveys the church and coaching inn, wondering where to find adventure nearby.","w":192},"102":{"p":null,"e":[],"en":"neutral","s":"The Doctor grapples the android, and both plunge through the lantern-room window; the machine shatters on rocks while he dangles from the balcony. Back inside, he offers the Terileptil a lift home, and the story ends.","w":196},"103":{"p":null,"e":[],"en":"neutral","s":"Bursting through a door, the Doctor walks into a pack of drooling zombies that quickly surround him. His plea to their better natures fails, and the story ends with him trapped in their clawing circle.","w":94},"104":{"p":null,"e":[[124,"choice","Continue to section 124"],[54,"choice","If he hasn’t already had a chat with the barmaid but you think he should"],[45,"choice","If you think he should leave the inn"]],"en":null,"s":"The Doctor joins a table of drinkers who grumble about another bad night and mention the ship that ran aground two nights earlier. They say the storm emptied the vessel of cargo and crew alike.","w":105},"105":{"p":null,"e":[[143,"choice","If you think the Doctor should respond with a thinly veiled threat"],[29,"choice","If you think he should offer the creature aid"]],"en":null,"s":"The Terileptil asks who the Doctor is and why he has come, and the Doctor names himself while recalling earlier meetings. He hints at past fireworks and asks the alien to explain its own business here.","w":98},"106":{"p":null,"e":[[115,"choice","If you think the Doctor should go after Ravenwood"],[123,"choice","If you think he should relocate the TARDIS to the beach to collect the miniaturised vessel"],[88,"choice","Continue to section 88"]],"en":null,"s":"The Doctor lands the TARDIS inside the lighthouse base and coordinates with Ravenwood at the top. Their beam and cannon lure the spawn into the wreck, shrink it away, and the smuggler then sprints off into the night.","w":322},"107":{"p":null,"e":[[127,"choice","If you think the Doctor should go and investigate the isolated moorland church"],[148,"choice","If you would prefer him to take a walk along the clifftop path towards the lighthouse"]],"en":null,"s":"Outside the Hispaniola, the Doctor remarks that the weather is as frosty as the welcome he received indoors. Pulling his jacket tight against the wind, he considers which way to go next.","w":49},"108":{"p":null,"e":[[146,"forced",""]],"en":null,"s":"Ravenwood replaces the blaster with a larger, unfamiliar weapon and threatens to dispose of the Doctor. The Time Lord bolts into the tunnel as a blast tears the wall behind him, lighting his escape with the sonic.","w":157},"109":{"p":null,"e":[[119,"choice","Continue to section 119"],[136,"choice","If he hasn’t already spoken to the old man sitting by himself and you think he should"],[17,"choice","If he hasn’t already talked to the young woman behind the bar but you think he should"],[107,"choice","If you think it’s time he left the inn"]],"en":null,"s":"Two parties draw the Doctor's eye: hard-faced men smoking pipes at a long table, and a rail-thin old man muttering alone near the hearth. The latter sits apart from everyone else in the room.","w":73},"110":{"p":null,"e":[[27,"choice","If you think the Doctor should head for the main entrance"],[140,"choice","If you think he should make a dash for the narrow door"]],"en":null,"s":"Moonlight reveals memorials bearing a few repeated surnames before a zombie enters the church, followed by twenty more. Eyeing both the main door and the tower door, the Doctor decides it is time to leave.","w":272},"111":{"p":null,"e":[[78,"choice","If you think the Doctor should head back the way he came"],[121,"choice","Continue to section 121"]],"en":null,"s":"The blaster fires again, but the Doctor dodges and springs out of the underground storeroom. Complaining that no one simply says hello, he flees with a choice of routes ahead.","w":46},"112":{"p":null,"e":[[52,"forced",""]],"en":null,"s":"The Doctor accepts Ravenwood's word and asks for his plan, learning the bay now swarms with hungry spawn. The embarrassed smuggler explains he meant to return to the lighthouse and act, and they set off.","w":139},"113":{"p":null,"e":[[146,"forced",""]],"en":null,"s":"As the smuggler's weapon discharges, the Doctor dives into the tunnel and a wall explodes behind him. Without glancing back, he keeps running through the dark, guided by his sonic screwdriver's blue glow.","w":67},"114":{"p":null,"e":[[49,"forced",""]],"en":null,"s":"Scanning the bay, the Doctor spots a light atop the lighthouse and takes the cliff track past the shipwreck. A giant Kraken surfaces at the cave mouth, but a sonic blast drives it back so he can climb on.","w":200},"115":{"p":null,"e":[],"en":"neutral","s":"Ravenwood snatches the miniaturised ship holding the Kraa'Kn and rides off, then vanishes with his red-eyed cyborg horse. The Doctor vows to find him again, though the story ends with the smuggler winning this round.","w":280},"116":{"p":null,"e":[[43,"choice","If you think the Doctor should try to capture the piece of parchment"],[130,"choice","If you think he should ignore it"]],"en":null,"s":"The Doctor crosses the windswept grass toward the church and stops at its overgrown churchyard wall. Before entering, he hears paper rustling and spots pale parchment fluttering nearby.","w":91},"117":{"p":null,"e":[[17,"choice","If the Doctor hasn’t already talked to the barmaid and you think he should do so now"],[119,"choice","If he hasn’t talked to the group of men at their table and you think he should"],[107,"choice","If you think it’s time he left the inn"]],"en":null,"s":"An old man deduces from the Doctor's accent that he is an outsider and shares tales of the Kraken that sank a ship. He also describes the smugglers' tunnels beneath the moors, and the Doctor thanks him before leaving.","w":183},"118":{"p":null,"e":[[60,"choice","If you think the Doctor should turn back"],[11,"choice","If you think he should head for the grim stone church"]],"en":null,"s":"Racing toward the TARDIS, the Doctor finds his route cut off when moonlight exposes a feral zombie pack. Realising a molecular fringe unit still animates them, he mutters Ravenwood's name and seeks another way.","w":108},"119":{"p":null,"e":[[136,"choice","Continue to section 136"],[17,"choice","If he hasn’t already talked to the barmaid and you think he should"],[107,"choice","If you think he should leave the inn without further ado"]],"en":null,"s":"The Doctor chats with a bearded man who jokes about the weather and the cargo ship that grounded two nights before. The table's laughter suggests they know more about the lost cargo, leaving him to wonder about the crew.","w":128},"120":{"p":null,"e":[],"en":"neutral","s":"Bess hugs the Doctor and thanks him before he steps into the TARDIS. The blue box wheezes away, leaving her and Ravenwood on the beach, and the story ends with their futures open.","w":102},"121":{"p":null,"e":[[36,"choice","If you think the Doctor should charge past the advancing figure"],[66,"choice","If you think he should stop and wait for the figure"]],"en":null,"s":"The Doctor races past the armed smuggler down a tunnel that steepens toward the sea. A wigged figure with jerky, ticking steps steps out ahead, and he gasps in disbelief at what it might be.","w":158},"122":{"p":null,"e":[[83,"forced",""]],"en":null,"s":"The Doctor connects the animation unit to his sonic and commands the undead, marching them into Bosmouth to fight the Kraa'Kn. They force the spawn into the wreck, which a lighthouse beam then sets ablaze.","w":288},"123":{"p":null,"e":[],"en":"neutral","s":"The Doctor retrieves the tiny ship of spawn just as Ravenwood rides up, and the smuggler concedes defeat. After the cyborg horse vanishes, the Doctor boards the TARDIS and departs, and the story ends with his victory.","w":265},"124":{"p":null,"e":[[54,"choice","If the Doctor hasn’t already chatted with the barmaid and you think he should do so now"],[104,"choice","If he hasn’t already talked to the group of men at their table and you think he should"],[45,"choice","If you think he should leave the inn"]],"en":null,"s":"The Doctor sits with a blind old man who recognises him by voice and accent as an outsider. The seadog recounts the Kraken's attack on a ship and the smugglers' tunnels, then the Doctor thanks him and leaves.","w":246},"125":{"p":null,"e":[[59,"forced",""]],"en":null,"s":"Using the sonic, the Doctor analyses the hanged corpse and explains molecular fringe animation to himself. While he studies the readout, the zombie seizes him, and an energy bolt strikes before darkness takes him.","w":160},"126":{"p":null,"e":[[114,"choice","If you think the Doctor should head for the bay"],[49,"choice","If you think he should make for the lighthouse"]],"en":null,"s":"Waking at the buried ship's entrance, the Doctor finds the Terileptil, android, and gas flask gone, and shuts off the animation unit. He is certain the alien's plans are nearing completion and wonders where they will unfold.","w":127},"127":{"p":null,"e":[[110,"choice","If you think the Doctor should study the interior of the church for clues"],[90,"choice","If you think he should investigate the narrow door on the other side of the nave"]],"en":null,"s":"Strolling toward the church, the Doctor is confronted by a noosed zombie, so he darts inside as the door proves unlocked. In the dark nave, using sonic light, he finds a tower door and searches for clues.","w":259},"128":{"p":null,"e":[[129,"forced",""]],"en":null,"s":"The Doctor drives two Kraa'Kn off Bess with a painful sonic whine, then Ravenwood steps forward and introduces himself to her. The Doctor notes wryly that nobody cares about his own name.","w":225},"129":{"p":null,"e":[[147,"forced",""]],"en":null,"s":"Bess insists on accompanying the two men, and Ravenwood backs her with a wink against the Doctor's objections. Grumbling about responsibility, the Doctor finally relents and leads them away toward the lighthouse.","w":95},"130":{"p":null,"e":[[85,"choice","If you think the Doctor should try talking to the zombie"],[72,"choice","If you think he should sprint for the safety of the church"],[2,"choice","If you think he should make for the building on the crest of the hill"]],"en":null,"s":"A figure emerges from the graveyard as moonlight reveals its rotting flesh, matted hair, and slack noose. The Doctor halts beyond its reach, startled, and compares the corpse to a horror-film extra in Cornwall.","w":116},"131":{"p":null,"e":[[53,"choice","If the name Ravenwood means anything to the Doctor"],[30,"choice","If not"]],"en":null,"s":"Approaching the unlit lighthouse by the clifftop path, the Doctor hears a futuristic buzz and turns to a man holding an odd pistol. The stranger aims at him and declares that this is where everything ends.","w":118},"132":{"p":null,"e":[[59,"forced",""]],"en":null,"s":"Among the headstones, the Doctor is encircled by a crowd of rotting undead whose hidden master answers his question. Their clawed hands seize him, a blow lands on his head, and he loses consciousness.","w":224},"133":{"p":null,"e":[[74,"choice","Continue to section 74"],[65,"choice","If you think the Doctor should simply do it himself before returning to his TARDIS"]],"en":null,"s":"The Doctor assembles a device from a solar pulse cannon, power cell, and teleport components, with Ravenwood helping. He explains that three people are needed and the smuggler volunteers to place the beacon in the wreck.","w":187},"134":{"p":null,"e":[[39,"choice","If you think the Doctor, distracted by what’s in front of him, should ignore Bess"],[18,"choice","If you think he should join her at the window"]],"en":null,"s":"The lighthouse door is unlocked, and the Doctor finds crates of spaceship parts inside before climbing to the lantern room. He spots a solar pulse cannon, and Bess calls him to the glass windows.","w":167},"135":{"p":null,"e":[[147,"forced",""]],"en":null,"s":"Recognising the rider, the Doctor introduces Bess and is told the man's name is Ravenwood. Bess pleads for help, and Ravenwood points out that both the hoard and the bay's mess belong to him before agreeing.","w":154},"136":{"p":null,"e":[[117,"choice","If you think the Doctor should stay and talk to the old man"],[17,"choice","If he hasn’t already talked to the barmaid and you think he would be better off doing so"],[119,"choice","If he hasn’t already spoken to the group of men at their table and you think he should"],[107,"choice","If you think he should leave the inn"]],"en":null,"s":"The Doctor sits beside the old man and only then notices his clouded eyes, realising he is blind. Apologising for disturbing him, the Doctor moves to go, but the Cornishman invites him to stay.","w":94},"137":{"p":null,"e":[],"en":"neutral","s":"As the Doctor rushes to stop the beacon, the android's shot ricochets off the mirror and ignites the device. A secondary explosion destroys the lantern room, killing the Terileptil, while the battered Doctor escapes and the story ends.","w":206},"138":{"p":null,"e":[[141,"forced",""]],"en":null,"s":"The Doctor agonises over whether he may condemn one species to save another, and Bess loses patience. Declaring the choice easy, she throws the switch before he can stop her, and the device cannot be turned off.","w":184},"139":{"p":null,"e":[[145,"choice","If you think the Doctor should turn and face whoever fired the weapon"],[131,"choice","If you think he should make a run for it"]],"en":null,"s":"Running into Bosmouth, the Doctor finds villagers already losing to Kraa'Kn spawn and helps where he can. He knows his efforts only delay the outcome, then an alien-sounding shot rings out behind him.","w":164},"140":{"p":null,"e":[[100,"choice","If the Doctor has a large iron key"],[34,"choice","If not"]],"en":null,"s":"The Doctor crosses the church, wedges the narrow door shut, and discovers a spiral stair going down instead of up. He descends with a lantern into a damp brick tunnel and finds a locked wooden door.","w":180},"141":{"p":null,"e":[[68,"forced",""]],"en":null,"s":"A false sun rises as Bess fires the unmodified solar cannon, which burns the wreck and turns beach sand to glass. The beam strikes the sea and boils it, drawing agonised squeals from the creatures below.","w":158},"142":{"p":null,"e":[[37,"choice","If you think the Doctor and Bess should go to the village"],[67,"choice","If you think they should go to the lighthouse"]],"en":null,"s":"Finding only Bess inside the church, the Doctor warns her about zombies and armed smugglers and drags her out across the moor. He asks whether they should aid the village or seek the lighthouse's vantage point.","w":174},"143":{"p":null,"e":[[126,"forced",""]],"en":null,"s":"The Terileptil explains its crashed vessel, centuries in stasis beneath a temple, and its awakening by smugglers. Offended by the Doctor's threat, it fires a purple bolt that knocks him unconscious.","w":259},"144":{"p":null,"e":[[110,"choice","If you think the Doctor should study the interior of the church for clues"],[90,"choice","If you think he should investigate the narrow door on the other side of the nave"]],"en":null,"s":"Finding the church door unlocked, the Doctor slips inside and lights his way with the sonic screwdriver. He notices a narrow door in the curving wall and hopes the church holds clues about the moor's troubles.","w":120},"145":{"p":null,"e":[[95,"choice","If the name Ravenwood means anything to the Doctor"],[33,"choice","If not"]],"en":null,"s":"A man emerges from the shadows near a narrow alley, dressed in knee-high riding boots and a flowing cape. His long black hair is pulled back into a ponytail as he steps into view.","w":41},"146":{"p":null,"e":[[13,"choice","If the Doctor has met Bess the barmaid"],[31,"choice","If not"]],"en":null,"s":"The Doctor races down the smugglers' tunnel until it opens into a sea cave and onto the shore. Village lights, the lighthouse, and a grounded wreck surround him, and then the smuggler reappears with a blaster.","w":262},"147":{"p":null,"e":[[35,"choice","If you think the Doctor should stay on the road"],[118,"choice","If you think he should take the more direct route across the moor"]],"en":null,"s":"The Doctor teases Ravenwood about his unlawfully acquired hoard before assigning roles: Bess at the lantern, Ravenwood placing the beacon, and himself inside the TARDIS. He hands out walkie-talkies and dashes off.","w":304},"148":{"p":null,"e":[[32,"choice","If you think the Doctor should scramble down to the bay"],[96,"choice","If you think he should make his way to the village"],[131,"choice","If you think he should visit the lighthouse"]],"en":null,"s":"Crossing the moor, the Doctor looks down on a broad bay with a village, an unlit lighthouse, and a stranded three-masted cargo ship. The sea froths unnaturally, and he wonders what drove the vessel aground and where its crew went.","w":181},"149":{"p":null,"e":[[88,"forced",""]],"en":null,"s":"Aboard the bucking TARDIS, the Doctor concludes they are trapped in a time loop and struggles to steady the controls. He punches a large red button, and a thunderous bang sends sparks raining down.","w":87},"150":{"p":null,"e":[],"en":"neutral","s":"Bess asks where the Kraa'Kn are, and the Doctor explains they are inside the dimensionally transcendental TARDIS pool. He promises to release them on a distant world, tells her to live her own adventure, and the story ends as he departs.","w":311}},"zh_ui_url":"../../assets/reader-zh.js?v=0e2b2b28"};
+
+</script>
+<script>
+/* AS Gamebook Reader - per-book reader runtime (shared template).
+ * Data: window.BOOK_DATA (slug, meta, structure + AI summaries), and
+ * optionally window.TEXT_PACK (full build) or a text pack stored in
+ * localStorage. All book-specific identity comes from BOOK_DATA; this file
+ * contains no hard-coded book names. Player-facing strings are English by
+ * default; a pack carrying "ui_locale": "zh" switches the whole UI to
+ * Chinese (see I18N / applyLocale).
+ *
+ * Two host modes:
+ *  - Standalone book package (skeleton/full HTML): BOOK_DATA is embedded in
+ *    the page; on DOMContentLoaded the reader mounts itself.
+ *  - Multi-book entry (as-gamebook-reader.html): the shelf calls
+ *    ASReader.mount(rootEl, bookData, textPack, hooks) when a book is opened
+ *    and ASReader.unmount(rootEl) when returning to the shelf. No globals
+ *    from one mounted book leak into the next.
+ */
+(function () {
+  "use strict";
+
+  function startReader(opts) {
+    // opts: { root, DATA, inlinePackSections (null unless full build),
+  var DATA = opts.DATA;
+  var ROOT = opts.root || document;
+  var HOOKS = opts.hooks || {};
+  var SLUG = DATA.slug;
+  var PACK_KIND = DATA.pack_kind || (SLUG + "_text_pack");
+  var SECTIONS = DATA.sections;
+  var TOTAL = DATA.count;
+  var TOTAL_WORDS = DATA.total_words || 0;
+  var START = DATA.start;
+  var ICON = DATA.icon;
+  var META = DATA.meta || {};
+
+  // Number of terminal sections (out-degree 0); used for the "all endings
+  // found" denominator only, which stays hidden until every one is reached.
+  var ENDING_TOTAL = (function () {
+    var n = 0;
+    Object.keys(SECTIONS).forEach(function (k) {
+      if (!SECTIONS[k].e.length) n++;
+    });
+    return n;
+  })();
+
+  var SAVE_KEY = SLUG + ".save.v1";
+  var PACK_KEY = SLUG + ".textpack.v1";
+  // Route map progress: a per-book list of every visited section number.
+  // roadmap.html reads the same key, so the map reveals only what was read.
+  var PROGRESS_KEY = "agb.progress.v1." + SLUG;
+  // Public book pages publish a roadmap beside index.html. Hosts without a
+  // map (private multi-book entry) leave this empty and hide the top-bar
+  // button instead of linking nowhere.
+  var ROADMAP_URL = DATA.roadmap_url || null;
+  var SAVE_EXPORT_NAME = SLUG + "_save.json";
+  var SAVE_VERSION = 2;
+
+  // ---------------- state ----------------
+  // stack: the current play line, stack[stack.length-1] is the current section.
+  // read: set of every section ever lit up (monotonic, survives new play lines).
+  // endings: sections reached that are terminals.
+  var state = null;
+  var mode = "summary";          // "summary" | "original"
+  var inlinePackSections = opts.inlinePackSections || null;
+  var textPack = inlinePackSections;
+  var inlinePack = !!textPack;
+  var pretendDate = null;        // null | "weekday" | "weekend" (session only)
+  var rollTimer = null;
+
+  // ---------------- UI localisation -------------------------------------
+  // English by default. A text pack may carry "ui_locale": "zh"; applyPack
+  // then switches every reader-generated string and the static template
+  // labels to Chinese. Packs without the field behave exactly as before.
+  var I18N = {
+    en: {
+      saveWriteFail: "Could not write the save (browser storage blocked).",
+      pctRead: "{pct}% read",
+      noteBuiltin: "Built-in full edition (private).",
+      notePack: "Original text pack loaded on this browser.",
+      noteSkeleton: "Skeleton edition: AI summaries only.",
+      noteProgress: " Progress saves automatically in this browser.",
+      endingsFound: "Endings found: {n}",
+      endingsAll: "Endings found: {n} / {total} \u2014 all found",
+      tbSection: "Section", tbRead: "Read",
+      tbSummary: "Summary", tbOriginal: "Original", tbShelf: "Shelf",
+      endDeath: "The End &mdash; Death",
+      endBad: "Bad Ending",
+      endNeutral: "The End",
+      endGood: "Good Ending &mdash; Mission Complete",
+      endRead: "{pct}% of the book read",
+      continueWord: "Continue",
+      puzzleDone: "I've worked out the number",
+      weekday: "weekday", weekend: "weekend",
+      dateReal: "Today is a <strong>{day}</strong>. ",
+      datePretend: "Today is a <s>{real}</s> &mdash; you are pretending it is a <strong>{fake}</strong>. ",
+      dateUseReal: "Use today's real date ({day})",
+      datePretendLink: "I'm pretending I'm reading on a {day}",
+      diceRoll: "Roll the dice",
+      diceResult: "You rolled a {n}.",
+      diceLucky: " Lucky 6!",
+      goTo: "{label} \u2014 go to {sec}",
+      coinToss: "Toss the coin",
+      heads: "Heads", tails: "Tails",
+      headsUp: "HEADS", tailsUp: "TAILS",
+      manualDivider: "Or decide the outcome yourself:",
+      statusBuiltin: "This is the built-in full edition: every section's original text is included. (Private build \u2014 do not share.)",
+      statusLoadedEn: "Loaded text pack: {book} ({n} sections, English).",
+      statusLoadedZh: "Loaded text pack: {book} ({n} sections, Chinese).",
+      statusNone: "No original text pack loaded. The skeleton plays with AI summaries only.",
+      entryStatusNone: "No original text pack imported for this book yet. Import the text pack from the book's menu on the shelf.",
+      noSave: "No save to export yet.",
+      saveImported: "Save imported. Continuing at section {sec}.",
+      saveBad: "That file is not a valid save for this book.",
+      packLoaded: "Text pack loaded ({n} sections).",
+      packBad: "That file is not a valid original text pack for this book.",
+      packUiMissing: "Could not load the Chinese interface. Check your connection and try again.",
+      clearConfirm: "Clear ALL reading progress in this browser? This cannot be undone.",
+      clearDone: "All progress cleared.",
+      gamebook: "Gamebook",
+      kicker: "Interactive Gamebook",
+      homeShelf: "Shelf", homeTitle: "Title",
+      homeShelfTip: "Back to the shelf",
+      homeTitleTip: "Back to the title screen",
+      restartFrom: "Restart from {sec}",
+      startNew: "Start New",
+      settingsWord: "Settings",
+      undoWord: "Undo",
+      undoTip: "Undo the last move on this play line",
+      sectionWord: "Section",
+      origTip: "Import the original text pack to enable this",
+      routeMapTip: "Open this book's route map",
+      routeMapWord: "Route map",
+      moreTip: "More top bar items",
+      moreWord: "More",
+      progressTip: "Share of the book you have read",
+      endingsTip: "Different endings you have reached",
+      backToShelf: "&larr; Back to the shelf",
+      fullRouteMap: "Full route map &middot; full spoilers",
+      fontSizeTitle: "Reading font size",
+      fontDecAria: "Decrease font size",
+      fontIncAria: "Increase font size",
+      fontInputAria: "Reading font size in pixels",
+      resetWord: "Reset",
+      fontSizeNote: "Applies to every book on this device. The reading text uses relative sizing, so 16\u00a0px is the default.",
+      tbItemsTitle: "Persistent top bar items",
+      tbItemsNote: "Untick an item to move it into the top bar\u2019s \u201cMore\u201d menu. Changes apply immediately and are remembered.",
+      tbcheckSection: "Section number",
+      tbcheckProgress: "Reading progress & bar",
+      tbcheckEndings: "Endings found counter",
+      tbcheckMode: "Summary / Original switch",
+      tbcheckHome: "Shelf / Title button",
+      readingModeTitle: "Reading mode",
+      readingModeAria: "Reading mode",
+      readingModeNote: "Switch between Summary and Original any time using the segmented control in the top bar while reading.",
+      loadPack: "Load text pack\u2026",
+      removePack: "Remove text pack",
+      removePackConfirm: "Remove the loaded text pack from this browser? The reader returns to the skeleton (AI summaries) and the interface switches back to English.",
+      resetEverything: "Reset everything (progress & loaded pack)",
+      resetEverythingConfirm: "Remove the loaded text pack AND clear all reading progress for this book in this browser? This cannot be undone.",
+      saveTitle: "Save",
+      saveNote: "Progress is saved automatically in this browser, one save slot.",
+      exportSave: "Export save\u2026",
+      importSave: "Import save\u2026",
+      clearProgress: "Clear all progress",
+      closeWord: "Close",
+      jumpbackTitle: "Return to\u2026",
+      jumpbackNote: "More than one section you have visited can lead here \u2014 choose which one to step back to.",
+      cancelWord: "Cancel"
+    }
+  };
+  var uiLocale = "en";
+  // Chinese UI strings live in reader_zh.js and are fetched only when a pack
+  // actually switches the interface to Chinese. This keeps every English
+  // reading page free of Chinese text.
+  var zhI18nState = "idle"; // idle | loading | ready | failed
+  var zhI18nWaiters = [];
+  var ZH_UI_URL = DATA.zh_ui_url || "reader-zh.js";
+
+  function loadZhI18n(done) {
+    if (zhI18nState === "ready") { done(true); return; }
+    if (zhI18nState === "failed") { done(false); return; }
+    zhI18nWaiters.push(done);
+    if (zhI18nState === "loading") return;
+    zhI18nState = "loading";
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = ZH_UI_URL;
+    s.onload = function () {
+      if (window.ASGR_I18N_ZH) {
+        I18N.zh = window.ASGR_I18N_ZH;
+        zhI18nState = "ready";
+      } else {
+        zhI18nState = "failed";
+      }
+      var waiters = zhI18nWaiters; zhI18nWaiters = [];
+      waiters.forEach(function (fn) { fn(zhI18nState === "ready"); });
+    };
+    s.onerror = function () {
+      zhI18nState = "failed";
+      var waiters = zhI18nWaiters; zhI18nWaiters = [];
+      waiters.forEach(function (fn) { fn(false); });
+    };
+    document.head.appendChild(s);
+  }
+
+  function ensureLocale(locale, done) {
+    if (locale !== "zh") { done(true); return; }
+    loadZhI18n(function (ok) {
+      if (!ok) uiLocale = "en";
+      done(ok);
+    });
+  }
+
+  // null | { book, sections, locale, builtIn }
+  var packInfo = null;
+  function t(key, vars) {
+    var dict = I18N[uiLocale];
+    var s = (dict && dict[key] != null) ? dict[key] : I18N.en[key];
+    if (s == null) return key;
+    if (vars) {
+      Object.keys(vars).forEach(function (k) {
+        s = String(s).split("{" + k + "}").join(vars[k]);
+      });
+    }
+    return s;
+  }
+
+  // ---------------- global reader settings (shared across all books) ----
+  // Stored under one tool-wide key: reading font size in px (applied to
+  // :root, scales the rem layout) and which chapter top-bar items stay
+  // persistent (unticked ones move into the "More" overflow menu).
+  var SETTINGS_KEY = "asgr.settings.v1";
+  var TB_KEYS = ["section", "progress", "endings", "mode", "home"];
+  var DEFAULT_SETTINGS = {
+    fontPx: 16,
+    tb: { section: true, progress: true, endings: true, mode: true, home: true }
+  };
+  var gSettings = loadGlobalSettings();
+
+  function loadGlobalSettings() {
+    var s;
+    try {
+      s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+    } catch (e) { s = {}; }
+    var font = parseInt(s.fontPx, 10);
+    if (!(font >= 12 && font <= 32)) font = 16;
+    var tb = {};
+    TB_KEYS.forEach(function (k) { tb[k] = s.tb && s.tb[k] === false ? false : true; });
+    return { fontPx: font, tb: tb };
+  }
+  function saveGlobalSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(gSettings)); }
+    catch (e) { /* storage blocked: apply for this session only */ }
+  }
+  function applyFontSize() {
+    document.documentElement.style.fontSize = gSettings.fontPx + "px";
+    var input = $("font-size-input");
+    if (input) input.value = gSettings.fontPx;
+  }
+
+  // ---------------- tiny helpers ----------------
+  // querySelector works on both Document (standalone package) and an Element
+  // container (multi-book entry mount); getElementById is Document-only.
+  function $(id) { return ROOT.querySelector("#" + id); }
+  function pad3(n) { return (n < 10 ? "00" : n < 100 ? "0" : "") + n; }
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function todayKind() {
+    var d = new Date().getDay();
+    return (d === 0 || d === 6) ? "weekend" : "weekday";
+  }
+  function packAvailable() { return !!textPack; }
+
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(function () { t.hidden = true; }, 2600);
+  }
+
+  // ---------------- persistence ----------------
+  function persist() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({
+        v: SAVE_VERSION,
+        cur: state.cur,
+        stack: state.stack,
+        read: Object.keys(state.read).map(Number),
+        endings: state.endings,
+        firstArrival: state.firstArrival || {},
+        jumps: state.jumps || []
+      }));
+    } catch (e) {
+      toast(t("saveWriteFail"));
+    }
+    writeProgress();
+  }
+
+  // Union the live read set with the history already stored for this book,
+  // keeping every visited section (nothing is trimmed) and putting the
+  // current section last: roadmap.html treats that last entry as "you are
+  // here" and reveals only its one-hop neighbours.
+  function writeProgress() {
+    var history = [];
+    var seen = {};
+    function keep(n) {
+      n = Number(n);
+      if (!SECTIONS.hasOwnProperty(String(n))) return;
+      if (seen[n]) return;
+      seen[n] = true;
+      history.push(n);
+    }
+    try {
+      var raw = localStorage.getItem(PROGRESS_KEY);
+      var stored = raw ? JSON.parse(raw) : [];
+      (Array.isArray(stored) ? stored : []).forEach(keep);
+    } catch (e) { /* ignore malformed history */ }
+    Object.keys(state.read).forEach(keep);
+    var cur = Number(state.cur);
+    var idx = history.indexOf(cur);
+    if (idx >= 0) history.splice(idx, 1);
+    if (SECTIONS.hasOwnProperty(String(cur))) history.push(cur);
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(history)); }
+    catch (e) { /* storage blocked: reading still works */ }
+  }
+
+  // Carry the stored history to the map as a URL fallback, in the same order
+  // (current section last). The map also reads PROGRESS_KEY directly.
+  function roadmapUrl() {
+    var history = [];
+    var seen = {};
+    function keep(n) {
+      n = Number(n);
+      if (!SECTIONS.hasOwnProperty(String(n))) return;
+      if (seen[n]) return;
+      seen[n] = true;
+      history.push(n);
+    }
+    try {
+      var raw = localStorage.getItem(PROGRESS_KEY);
+      var stored = raw ? JSON.parse(raw) : [];
+      (Array.isArray(stored) ? stored : []).forEach(keep);
+    } catch (e) { /* ignore */ }
+    Object.keys(state.read).forEach(keep);
+    var cur = Number(state.cur);
+    var idx = history.indexOf(cur);
+    if (idx >= 0) history.splice(idx, 1);
+    if (SECTIONS.hasOwnProperty(String(cur))) history.push(cur);
+    return ROADMAP_URL + "?visited=" + history.join(",");
+  }
+
+  function openRouteMap() {
+    if (!ROADMAP_URL) return;
+    window.location.href = roadmapUrl();
+  }
+
+  function loadSave() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (!obj || (obj.v !== 1 && obj.v !== SAVE_VERSION) ||
+          typeof obj.cur !== "number")
+        return null;
+      var read = {};
+      (obj.read || []).forEach(function (n) {
+        if (SECTIONS.hasOwnProperty(String(n))) read[n] = true;
+      });
+      if (!SECTIONS.hasOwnProperty(String(obj.cur))) return null;
+      var stack = (obj.stack || [obj.cur]).filter(function (n) {
+        return SECTIONS.hasOwnProperty(String(n));
+      });
+      if (!stack.length) stack = [obj.cur];
+      // firstArrival was introduced in v2. A v1 save has no parent data;
+      // its already-lit sections render at depth 0 (no edges) until new
+      // moves attach descendants. See sanitizeFirstArrival.
+      var firstArrival = sanitizeFirstArrival(obj.firstArrival || {}, read);
+      var jumps = sanitizeJumps(obj.jumps || [], stack.length);
+      return {
+        cur: obj.cur,
+        stack: stack,
+        read: read,
+        endings: (obj.endings || []).filter(function (n) {
+          return SECTIONS.hasOwnProperty(String(n));
+        }),
+        firstArrival: firstArrival,
+        jumps: jumps
+      };
+    } catch (e) { return null; }
+  }
+
+  // Stack indices entered via a story-tree jump. Older saves have none,
+  // which just gives ordinary linear Undo everywhere.
+  function sanitizeJumps(arr, stackLen) {
+    var seen = {};
+    var out = [];
+    (Array.isArray(arr) ? arr : []).forEach(function (n) {
+      n = Number(n);
+      if (n === (n | 0) && n >= 1 && n < stackLen && !seen[n]) {
+        seen[n] = true;
+        out.push(n);
+      }
+    });
+    return out.sort(function (a, b) { return a - b; });
+  }
+
+  // Keep only firstArrival entries whose section and parent are both lit
+  // and valid, and whose edge index exists on the parent. This prevents a
+  // tampered/imported save from breaking the tree layout.
+  function sanitizeFirstArrival(fa, read) {
+    var out = {};
+    Object.keys(fa).forEach(function (k) {
+      var sec = parseInt(k, 10);
+      if (!read[sec]) return;
+      var rec = fa[k];
+      if (!rec || typeof rec.parent !== "number") return;
+      if (!read[rec.parent] && rec.parent !== START) return;
+      var psec = SECTIONS[String(rec.parent)];
+      if (!psec || typeof rec.edgeIdx !== "number" ||
+          rec.edgeIdx < 0 || rec.edgeIdx >= psec.e.length) return;
+      if (psec.e[rec.edgeIdx][0] !== sec) return;
+      out[sec] = { parent: rec.parent, edgeIdx: rec.edgeIdx };
+    });
+    return out;
+  }
+
+  // Apply a loaded pack to the runtime: the body text always replaces
+  // textPack; an optional "structure" section (same shape as
+  // book_structure.json) additionally overlays the runtime SECTIONS'
+  // choice labels and prompts, so a localised pack can translate the
+  // options too. English packs without a structure behave exactly as
+  // before (structure overlay is purely additive).
+  function applyPack(packObj) {
+    textPack = packObj.sections;
+    inlinePack = false;
+    var locale = packObj.ui_locale === "zh" ? "zh" : "en";
+    uiLocale = locale;
+    packInfo = {
+      book: packObj.book || "",
+      sections: Object.keys(packObj.sections).length,
+      locale: locale
+    };
+    if (!packObj.structure || !packObj.structure.sections) return locale;
+    var ov = packObj.structure.sections;
+    for (var k in ov) {
+      var sec = SECTIONS[k];
+      var node = ov[k];
+      if (!sec || !node) continue;
+      if (node.prompt != null) sec.p = node.prompt;
+      if (Array.isArray(node.edges)) {
+        // Overlay labels by position, guarding on matching targets so a
+        // mis-ordered overlay can never corrupt a wrong edge.
+        for (var i = 0; i < node.edges.length && i < sec.e.length; i++) {
+          var oe = node.edges[i];
+          var se = sec.e[i];
+          if (oe.target === se[0] &&
+              (oe.kind === undefined || oe.kind === se[1]) &&
+              oe.label != null) {
+            se[2] = oe.label;
+          }
+        }
+      }
+    }
+    return locale;
+  }
+
+  // Host API used by the encrypted-vault front end: apply a pack that was
+  // decrypted in memory, switch the reading body to the original text and
+  // re-localise the whole reader. No storage is touched here; the caller
+  // keeps the pack only for the lifetime of the page. Resolves false when
+  // the Chinese UI asset could not be loaded.
+  function applyPackFromHost(packObj) {
+    var locale = packObj.ui_locale === "zh" ? "zh" : "en";
+    return new Promise(function (resolve) {
+      ensureLocale(locale, function (ok) {
+        if (!ok) { resolve(false); return; }
+        applyPack(packObj);
+        mode = "original";
+        refreshPackStatus();
+        applyLocale();
+        resolve(true);
+      });
+    });
+  }
+
+  function loadStoredPack() {
+    if (inlinePack) return null;
+    // Entry (multi-book) hosts keep text packs in IndexedDB and hand the
+    // sections over at mount time; standalone packages use localStorage.
+    if (HOOKS.providedPack) {
+      var provided = HOOKS.providedPack();
+      if (provided) {
+        // Entry hosts may hand over either a bare sections map (English
+        // packs) or a full pack object carrying a localised structure.
+        if (provided.sections) return provided;
+        textPack = provided;
+      }
+      return null;
+    }
+    try {
+      var raw = localStorage.getItem(PACK_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (obj && obj.kind === PACK_KIND && obj.sections) return obj;
+    } catch (e) { /* corrupt pack: ignore */ }
+    return null;
+  }
+
+  function freshState() {
+    return { cur: START, stack: [START], read: {}, endings: [],
+             firstArrival: {}, jumps: [] };
+  }
+
+  // ---------------- navigation ----------------
+  function gotoSection(target) {
+    target = Number(target);
+    if (!SECTIONS.hasOwnProperty(String(target))) return;
+    var firstVisit = !state.read[target];
+    if (firstVisit) {
+      // Keep the exact edge used for the first arrival in the save (older
+      // saves still carry this field even though the tree view is retired).
+      var from = state.cur;
+      var psec = SECTIONS[String(from)];
+      var idx = -1;
+      if (psec) {
+        for (var i = 0; i < psec.e.length; i++) {
+          if (psec.e[i][0] === target) { idx = i; break; }
+        }
+      }
+      if (idx >= 0) state.firstArrival[target] = { parent: from, edgeIdx: idx };
+    }
+    state.stack.push(target);
+    state.cur = target;
+    state.read[target] = true;
+    var sec = SECTIONS[String(target)];
+    if (!sec.e.length && sec.en && state.endings.indexOf(target) < 0) {
+      state.endings.push(target);
+    }
+    persist();
+    renderChapter();
+    window.scrollTo(0, 0);
+  }
+
+  // Undo: sections entered by an old tree-style teleport jump (legacy saves
+  // only) have no single "previous" section. Instead return to a section
+  // that can lead into the current one in the book graph and that the
+  // reader has already visited:
+  //   - exactly one such predecessor  -> step straight back to it
+  //   - several                        -> ask which one
+  //   - none                           -> fall back to the prior frame
+  // Frames reached by an ordinary choice undo linearly, as before.
+  function undo() {
+    if (state.stack.length <= 1) return;
+    var top = state.stack.length - 1;
+    if (state.jumps.indexOf(top) >= 0) {
+      var preds = readPredecessors(state.cur);
+      if (preds.length === 1) { stepBackTo(preds[0]); return; }
+      if (preds.length > 1) { openJumpBack(preds); return; }
+    }
+    state.stack.pop();
+    state.cur = state.stack[state.stack.length - 1];
+    state.jumps = (state.jumps || []).filter(function (k) { return k < top; });
+    persist();
+    renderChapter();
+    window.scrollTo(0, 0);
+  }
+
+  // All sections with an edge into `sec` that the reader has visited.
+  // Deterministic numeric order.
+  function readPredecessors(sec) {
+    var out = [];
+    Object.keys(SECTIONS).forEach(function (k) {
+      var p = Number(k);
+      if (!state.read[p]) return;
+      var edges = SECTIONS[k].e || [];
+      for (var i = 0; i < edges.length; i++) {
+        if (edges[i][0] === sec) { out.push(p); break; }
+      }
+    });
+    return out.sort(function (a, b) { return a - b; });
+  }
+
+  function jumpBackSnippet(sec) {
+    var d = SECTIONS[String(sec)];
+    var raw = d && d.s ? d.s : "";
+    var txt = String(raw).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    return txt.length > 90 ? txt.slice(0, 90) + "…" : txt;
+  }
+
+  // Ask which already-read predecessor of the current section to return to.
+  function openJumpBack(preds) {
+    var backdrop = $("jumpback-backdrop");
+    var list = $("jumpback-list");
+    list.innerHTML = "";
+    preds.forEach(function (sec) {
+      var b = document.createElement("button");
+      b.className = "jumpback-item btn btn-ghost";
+      b.type = "button";
+      b.innerHTML =
+        '<span class="jumpback-no">' + esc(pad3(sec)) + "</span>" +
+        '<span class="jumpback-sum">' + esc(jumpBackSnippet(sec)) + "</span>";
+      b.addEventListener("click", function () { stepBackTo(sec); });
+      list.appendChild(b);
+    });
+    backdrop.hidden = false;
+  }
+
+  function closeJumpBack() {
+    $("jumpback-backdrop").hidden = true;
+  }
+
+  // Replace the jump frame with the chosen predecessor (the teleported
+  // frame is consumed, so undoing again from there behaves normally).
+  function stepBackTo(sec) {
+    state.stack.pop();
+    state.stack.push(sec);
+    state.cur = sec;
+    var top = state.stack.length - 1;
+    state.jumps = (state.jumps || []).filter(function (k) { return k !== top; });
+    persist();
+    closeJumpBack();
+    renderChapter();
+    window.scrollTo(0, 0);
+  }
+
+  function startNewLine() {
+    state.stack = [START];
+    state.cur = START;
+    state.read[START] = true;
+    state.jumps = [];
+    persist();
+    showChapter();
+  }
+
+  // ---------------- rendering: screens ----------------
+  function showTitle() {
+    $("title-screen").hidden = false;
+    $("chapter-screen").hidden = true;
+    $("settings-backdrop").hidden = true;
+    var saved = loadSave();
+    var has = !!saved;
+    $("btn-continue").hidden = !has;
+    var readMap = state ? state.read : (saved ? saved.read : {});
+    var pct = pctOf(readMap).toFixed(2);
+    $("title-progress-fill").style.width = pct + "%";
+    $("title-progress-text").textContent = t("pctRead", { pct: pct });
+    $("title-save-note").textContent =
+      (inlinePack ? t("noteBuiltin") :
+       packAvailable() ? t("notePack") :
+       t("noteSkeleton")) +
+      t("noteProgress");
+  }
+
+  function showChapter() {
+    $("title-screen").hidden = true;
+    $("chapter-screen").hidden = false;
+    renderChapter();
+  }
+
+  // The old in-page story tree is retired: the top bar opens the book's
+  // full route map page instead (progress travels via localStorage and the
+  // ?visited= fallback).
+
+  // Progress = original-text characters of read sections / whole book.
+  // Falls back to section counting only if a build lacks word weights.
+  function readWords(readMap) {
+    var n = 0;
+    Object.keys(readMap).forEach(function (k) {
+      var sec = SECTIONS[k];
+      n += sec && typeof sec.w === "number" ? sec.w : 0;
+    });
+    return n;
+  }
+
+  function pctOf(readMap) {
+    if (TOTAL_WORDS > 0) return readWords(readMap) / TOTAL_WORDS * 100;
+    return Object.keys(readMap).length / TOTAL * 100;
+  }
+
+  function progressPct() {
+    return pctOf(state.read).toFixed(2);
+  }
+
+  // Always-on chapter top bar stats: weighted read percentage with a thin
+  // live progress bar, and the endings counter. The endings total is hidden
+  // until every ending has been reached ("Endings found: n / N - all found").
+  function updateTopbarStats() {
+    var pct = progressPct();
+    var pctEl = $("chapter-progress");
+    var fill = $("topbar-progress-fill");
+    if (pctEl) pctEl.textContent = t("pctRead", { pct: pct });
+    if (fill) fill.style.width = pct + "%";
+
+    var counter = $("endings-counter");
+    if (counter) {
+      var found = state.endings.length;
+      if (ENDING_TOTAL > 0 && found >= ENDING_TOTAL) {
+        counter.textContent =
+          t("endingsAll", { n: found, total: ENDING_TOTAL });
+      } else {
+        counter.textContent = t("endingsFound", { n: found });
+      }
+    }
+  }
+
+  // State of the Summary | Original segmented control in the chapter top bar.
+  function updateModeControl() {
+    var sum = $("btn-mode-summary");
+    var orig = $("btn-mode-original");
+    if (!sum || !orig) return;
+    var available = packAvailable();
+    orig.disabled = !available;
+    sum.classList.toggle("seg-active", mode === "summary");
+    orig.classList.toggle("seg-active", mode === "original");
+    sum.setAttribute("aria-pressed", mode === "summary" ? "true" : "false");
+    orig.setAttribute("aria-pressed", mode === "original" ? "true" : "false");
+    // overflow-menu proxies (visible only when the control is moved there)
+    var psum = $("tbmore-mode-summary"), porig = $("tbmore-mode-original");
+    if (psum && porig) {
+      porig.disabled = !available;
+      psum.classList.toggle("seg-active", mode === "summary");
+      porig.classList.toggle("seg-active", mode === "original");
+    }
+  }
+
+  // ---- persistent vs overflow ("More") top bar items ----
+  // Build the overflow menu's proxy nodes once. Each maps 1:1 to a
+  // data-tbkey item; applyTopbar() shows a proxy exactly when its primary
+  // item has been unticked in Settings.
+  function buildTbMoreMenu() {
+    var menu = $("tbmore-menu");
+    if (!menu || menu._built) return;
+    menu._built = true;
+    menu.innerHTML =
+      '<div class="tbmore-item" data-more="section">' + t("tbSection") +
+        '<span class="tbmore-val" id="tbmore-section">001</span></div>' +
+      '<div class="tbmore-item" data-more="progress">' + t("tbRead") +
+        '<span class="tbmore-val" id="tbmore-section-prog"></span></div>' +
+      '<div class="tbmore-item" data-more="endings" style="display:block">' +
+        '<span id="tbmore-endings">' + t("endingsFound", { n: 0 }) +
+        "</span></div>" +
+      '<div class="tbmore-item" data-more="mode">' +
+        '<div class="seg-control tbmore-seg">' +
+          '<button id="tbmore-mode-summary" type="button" class="seg-btn">' +
+            t("tbSummary") + '</button>' +
+          '<button id="tbmore-mode-original" type="button" class="seg-btn">' +
+            t("tbOriginal") + '</button>' +
+        '</div></div>' +
+      '<button type="button" class="tbmore-item" data-more="home">' +
+        '<span id="tbmore-home-label">' + t("tbShelf") + '</span></button>';
+    $("tbmore-mode-summary").addEventListener("click", function () {
+      setMode("summary");
+    });
+    $("tbmore-mode-original").addEventListener("click", function () {
+      setMode("original");
+    });
+    menu.querySelector('[data-more="home"]').addEventListener("click", goHome);
+  }
+
+  function applyTopbar() {
+    buildTbMoreMenu();
+    var anyHidden = false;
+    TB_KEYS.forEach(function (key) {
+      var persistent = gSettings.tb[key] !== false;
+      Array.prototype.forEach.call(
+        ROOT.querySelectorAll('[data-tbkey="' + key + '"]'),
+        function (el) { el.hidden = !persistent; });
+      var proxy = ROOT.querySelector('[data-more="' + key + '"]');
+      if (proxy) proxy.hidden = persistent;
+      if (!persistent) anyHidden = true;
+    });
+    var moreBtn = $("btn-tbmore");
+    if (moreBtn) moreBtn.hidden = !anyHidden;
+    var menu = $("tbmore-menu");
+    if (menu && !anyHidden) menu.hidden = true;
+  }
+
+  function syncTbMoreValues() {
+    var sec = $("tbmore-section");
+    if (sec) sec.textContent = pad3(state.cur);
+    var prog = $("tbmore-section-prog");
+    if (prog) prog.textContent = progressPct() + "%";
+    var en = $("tbmore-endings");
+    if (en) en.textContent = $("endings-counter").textContent;
+  }
+
+  function goHome() {
+    if (HOOKS.onHome) { HOOKS.onHome(); return; }
+    showTitle();
+  }
+
+  // ---------------- rendering: chapter ----------------
+  function renderChapter() {
+    var sec = SECTIONS[String(state.cur)];
+    $("chapter-num").textContent = pad3(state.cur);
+    updateTopbarStats();
+    syncTbMoreValues();
+    $("btn-undo").disabled = state.stack.length <= 1;
+
+    // body text
+    var box = $("chapter-text");
+    var html = "";
+    if (mode === "original" && packAvailable() &&
+        textPack[String(state.cur)]) {
+      var segs = textPack[String(state.cur)];
+      html = segs.map(function (g) {
+        return g.t === "p" ? "<p>" + g.html + "</p>" : "";
+      }).join("");
+    } else {
+      html = "<p>" + esc(sec.s) + "</p>";
+    }
+    box.innerHTML = html;
+    if (sec.p) {
+      box.insertAdjacentHTML("beforeend",
+        '<div class="chapter-prompt">' + esc(sec.p) + "</div>");
+    }
+
+    // Return to the top of the article on every chapter switch. The
+    // scroll container is .chapter-body (overflow-y: auto), not the
+    // window, so window.scrollTo() does not reset the reading position.
+    var bodyEl = document.querySelector(".chapter-body");
+    if (bodyEl) bodyEl.scrollTop = 0;
+    window.scrollTo(0, 0);
+
+    // reading-mode segmented control (Summary | Original)
+    updateModeControl();
+
+    var isEnding = !sec.e.length;
+    $("ending-banner").hidden = !isEnding;
+    // The dock action row is always present: Undo sits at the bottom-right
+    // next to the choices; Restart joins it only on an ending section.
+    var restartBtn = $("btn-ending-restart");
+    if (restartBtn) {
+      restartBtn.hidden = !isEnding;
+      if (isEnding) {
+        restartBtn.textContent = t("restartFrom", { sec: pad3(START) });
+      }
+    }
+    if (isEnding) renderEnding(sec);
+
+    $("mechanic-note").innerHTML = "";
+    var choices = $("choices");
+    choices.innerHTML = "";
+    if (!isEnding) renderEdges(sec, choices);
+  }
+
+  function renderEnding(sec) {
+    var banner = $("ending-banner");
+    banner.className = "ending-banner et-" + (sec.en || "neutral");
+    var labelKey = ({
+      death: "endDeath", bad: "endBad",
+      neutral: "endNeutral", good: "endGood"
+    })[sec.en || "neutral"];
+    $("ending-banner-text").innerHTML = t(labelKey) +
+      ' &middot; <span style="letter-spacing:.06em">' +
+      t("endRead", { pct: progressPct() }) + "</span>";
+  }
+
+  // ---------------- rendering: options & mechanics ----------------
+  function choiceButton(label, target, extraClass) {
+    var b = document.createElement("button");
+    b.className = "btn choice-btn" + (extraClass ? " " + extraClass : "");
+    b.innerHTML =
+      '<img class="choice-bullet" src="' + ICON + '" alt="">' +
+      '<span class="choice-label">' + esc(label) + "</span>" +
+      '<span class="choice-target">' + pad3(target) + "</span>";
+    b.addEventListener("click", function () { gotoSection(target); });
+    return b;
+  }
+
+  function renderEdges(sec, choices) {
+    var kinds = sec.e.map(function (e) { return e[1]; });
+    var note = $("mechanic-note");
+
+    if (kinds.indexOf("date") >= 0) { renderDate(sec, choices, note); return; }
+    if (kinds.indexOf("dice") >= 0) { renderDice(sec, choices, note); return; }
+    if (kinds.indexOf("coin") >= 0) { renderCoin(sec, choices, note); return; }
+
+    sec.e.forEach(function (edge) {
+      var target = edge[0], kind = edge[1], label = edge[2];
+      if (kind === "forced") {
+        choices.appendChild(choiceButton(t("continueWord"), target));
+      } else if (kind === "puzzle") {
+        // 056 secret door: no input box, no code shown, one confident button.
+        choices.appendChild(
+          choiceButton(t("puzzleDone"), target, "is-puzzle"));
+      } else if (kind === "choice") {
+        choices.appendChild(choiceButton(label, target));
+      }
+    });
+  }
+
+  // 034 - only the exit matching the effective date is rendered.
+  // Labels may be English ("weekday"/"weekend") or localised; the Chinese
+  // spellings are kept as escapes so the default bundle stays ASCII-only.
+  function renderDate(sec, choices, note) {
+    var real = todayKind();
+    var effective = pretendDate || real;
+    var edge = sec.e.filter(function (e) {
+      var l = e[2].toLowerCase();
+      if (effective === "weekday") {
+        return l.indexOf("weekday") >= 0 ||
+          l.indexOf("\u5de5\u4f5c\u65e5") >= 0;
+      }
+      return l.indexOf("weekend") >= 0 ||
+        l.indexOf("\u5468\u672b") >= 0;
+    })[0];
+
+    var realWord = t(real);
+    var pretendWord = t(real === "weekday" ? "weekend" : "weekday");
+
+    var html = pretendDate
+      ? t("datePretend", { real: realWord, fake: t(pretendDate) })
+      : t("dateReal", { day: realWord });
+    note.innerHTML = html;
+
+    var toggle = document.createElement("a");
+    toggle.href = "#";
+    toggle.className = "pretend-link";
+    toggle.textContent = pretendDate
+      ? t("dateUseReal", { day: realWord })
+      : t("datePretendLink", { day: pretendWord });
+    toggle.style.color = "var(--gold-bright)";
+    toggle.style.fontSize = ".88rem";
+    toggle.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      // Internal value stays the English enum; only rendering is localised.
+      pretendDate = pretendDate
+        ? null : (real === "weekday" ? "weekend" : "weekday");
+      renderChapter();
+    });
+    note.appendChild(document.createTextNode(" "));
+    note.appendChild(toggle);
+
+    choices.appendChild(choiceButton(edge[2], edge[0]));
+  }
+
+  // 009 - roll 1d6: 6 -> 018, anything else -> 087.
+  function renderDice(sec, choices, note) {
+    var win = sec.e.filter(function (e) { return e[0] === 18; })[0];
+    var lose = sec.e.filter(function (e) { return e[0] === 87; })[0];
+
+    var row = document.createElement("div");
+    row.className = "randomiser";
+    var rollBtn = document.createElement("button");
+    rollBtn.className = "btn btn-primary";
+    rollBtn.textContent = t("diceRoll");
+    var out = document.createElement("span");
+    out.className = "random-output";
+    out.textContent = "\u2022";
+    row.appendChild(rollBtn);
+    row.appendChild(out);
+    choices.appendChild(row);
+
+    rollBtn.addEventListener("click", function () {
+      rollBtn.disabled = true;
+      out.classList.add("rolling");
+      var ticks = 0;
+      clearInterval(rollTimer);
+      rollTimer = setInterval(function () {
+        out.textContent = String(1 + Math.floor(Math.random() * 6));
+        if (++ticks >= 8) {
+          clearInterval(rollTimer);
+          var n = 1 + Math.floor(Math.random() * 6);
+          out.classList.remove("rolling");
+          out.textContent = String(n);
+          var dest = n === 6 ? win : lose;
+          note.textContent = t("diceResult", { n: n }) +
+            (n === 6 ? t("diceLucky") : "");
+          setTimeout(function () { gotoSection(dest[0]); }, 850);
+        }
+      }, 90);
+    });
+
+    addManualDivider(choices);
+    choices.appendChild(choiceButton(
+      t("goTo", { label: win[2], sec: pad3(win[0]) }), win[0]));
+    choices.appendChild(choiceButton(
+      t("goTo", { label: lose[2], sec: pad3(lose[0]) }), lose[0]));
+  }
+
+  // 130 - fair coin: heads -> 091, tails -> 138.
+  function renderCoin(sec, choices, note) {
+    var heads = sec.e.filter(function (e) { return e[0] === 91; })[0];
+    var tails = sec.e.filter(function (e) { return e[0] === 138; })[0];
+
+    var row = document.createElement("div");
+    row.className = "randomiser";
+    var tossBtn = document.createElement("button");
+    tossBtn.className = "btn btn-primary";
+    tossBtn.textContent = t("coinToss");
+    var out = document.createElement("span");
+    out.className = "random-output";
+    out.textContent = "\u2022";
+    row.appendChild(tossBtn);
+    row.appendChild(out);
+    choices.appendChild(row);
+
+    tossBtn.addEventListener("click", function () {
+      tossBtn.disabled = true;
+      out.classList.add("rolling");
+      var ticks = 0;
+      clearInterval(rollTimer);
+      rollTimer = setInterval(function () {
+        out.textContent = ticks % 2 ? "H" : "T";
+        if (++ticks >= 9) {
+          clearInterval(rollTimer);
+          var headsUp = Math.random() < 0.5;
+          out.classList.remove("rolling");
+          out.textContent = headsUp ? t("headsUp") : t("tailsUp");
+          var dest = headsUp ? heads : tails;
+          setTimeout(function () { gotoSection(dest[0]); }, 850);
+        }
+      }, 90);
+    });
+
+    addManualDivider(choices);
+    choices.appendChild(choiceButton(
+      t("goTo", { label: t("heads"), sec: pad3(heads[0]) }), heads[0]));
+    choices.appendChild(choiceButton(
+      t("goTo", { label: t("tails"), sec: pad3(tails[0]) }), tails[0]));
+  }
+
+  function addManualDivider(choices) {
+    var d = document.createElement("div");
+    d.className = "manual-divider";
+    d.textContent = t("manualDivider");
+    choices.appendChild(d);
+  }
+
+  // ---------------- settings ----------------
+  function refreshPackStatus() {
+    var status = $("pack-status");
+    if (status) {
+      if (inlinePack) {
+        status.textContent = t("statusBuiltin");
+      } else if (packAvailable() && packInfo) {
+        status.textContent = t(packInfo.locale === "zh"
+          ? "statusLoadedZh" : "statusLoadedEn", {
+          book: packInfo.book || SLUG,
+          n: packInfo.sections
+        });
+      } else {
+        status.textContent = HOOKS.providedPack
+          ? t("entryStatusNone") : t("statusNone");
+      }
+    }
+    // The remove-pack button only makes sense for a localStorage-loaded
+    // pack in a standalone package (never for the built-in full edition).
+    var unloadBtn = $("btn-unload-pack");
+    if (unloadBtn) {
+      unloadBtn.hidden = inlinePack || HOOKS.providedPack ||
+        !packAvailable();
+    }
+    updateModeControl();
+  }
+
+  function setMode(m) {
+    if (m === "original" && !packAvailable()) return;
+    mode = m;
+    refreshPackStatus();
+    if (!$("chapter-screen").hidden) renderChapter();
+  }
+
+  function exportSave() {
+    var raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) { toast(t("noSave")); return; }
+    var blob = new Blob([raw], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = SAVE_EXPORT_NAME;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+  }
+
+  function importSave(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var msg = $("settings-message");
+      try {
+        var obj = JSON.parse(reader.result);
+        if (!obj || (obj.v !== 1 && obj.v !== SAVE_VERSION) ||
+            !SECTIONS.hasOwnProperty(String(obj.cur))) {
+          throw new Error("bad version");
+        }
+        var readArr = obj.read || [];
+        var readTmp = {};
+        readArr.forEach(function (n) {
+          if (SECTIONS.hasOwnProperty(String(n))) readTmp[n] = true;
+        });
+        var fa = sanitizeFirstArrival(obj.firstArrival || {}, readTmp);
+        localStorage.setItem(SAVE_KEY, JSON.stringify({
+          v: SAVE_VERSION,
+          cur: obj.cur,
+          stack: obj.stack || [obj.cur],
+          read: readArr,
+          endings: obj.endings || [],
+          firstArrival: fa,
+          jumps: sanitizeJumps(obj.jumps || [],
+                               (obj.stack || [obj.cur]).length)
+        }));
+        state = loadSave() || freshState();
+        msg.classList.remove("error");
+        msg.textContent = t("saveImported", { sec: pad3(state.cur) });
+        showTitle();
+      } catch (e) {
+        msg.classList.add("error");
+        msg.textContent = t("saveBad");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function importPack(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var msg = $("settings-message");
+      var obj;
+      try {
+        obj = JSON.parse(reader.result);
+        if (!obj || obj.kind !== PACK_KIND || !obj.sections) {
+          throw new Error("bad pack");
+        }
+      } catch (e) {
+        msg.classList.add("error");
+        msg.textContent = t("packBad");
+        return;
+      }
+      var locale = obj.ui_locale === "zh" ? "zh" : "en";
+      ensureLocale(locale, function (ok) {
+        if (!ok) {
+          msg.classList.add("error");
+          msg.textContent = t("packUiMissing");
+          return;
+        }
+        localStorage.setItem(PACK_KEY, JSON.stringify(obj));
+        applyPack(obj);
+        inlinePack = false;
+        msg.classList.remove("error");
+        msg.textContent = t("packLoaded", {
+          n: Object.keys(textPack).length
+        });
+        setMode("original");
+        applyLocale();
+        refreshPackStatus();
+      });
+    };
+    reader.readAsText(file);
+  }
+
+  // Remove the localStorage text pack. The runtime SECTIONS were mutated in
+  // place by applyPack, so a reload is the clean way to restore the embedded
+  // English structure (and the English UI).
+  function unloadPack() {
+    if (!window.confirm(t("removePackConfirm"))) return;
+    localStorage.removeItem(PACK_KEY);
+    location.reload();
+  }
+
+  // Wipe everything this HTML stored: the reading save AND the loaded pack.
+  // Global, cross-book reader settings (font size, top-bar layout) are shared
+  // by every book and are deliberately left untouched.
+  function resetEverything() {
+    if (!window.confirm(t("resetEverythingConfirm"))) return;
+    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(PACK_KEY);
+    localStorage.removeItem(PROGRESS_KEY);
+    location.reload();
+  }
+
+  // ---------------- wire-up ----------------
+  function bind() {
+    $("btn-continue").addEventListener("click", function () {
+      state = loadSave() || freshState();
+      showChapter();
+    });
+    $("btn-start").addEventListener("click", function () {
+      var saved = loadSave();
+      if (!saved) {
+        state = freshState();
+        state.read[START] = true;
+        persist();
+      } else {
+        state = saved;            // read set is monotonic
+        state.stack = [START];
+        state.cur = START;
+        state.read[START] = true;
+        persist();
+      }
+      showChapter();
+    });
+    $("btn-settings").addEventListener("click", function () {
+      $("settings-message").textContent = "";
+      refreshPackStatus();
+      $("settings-backdrop").hidden = false;
+    });
+    $("btn-settings-close").addEventListener("click", function () {
+      $("settings-backdrop").hidden = true;
+    });
+    $("settings-backdrop").addEventListener("click", function (ev) {
+      if (ev.target === this) this.hidden = true;
+    });
+
+    // The single Undo button lives in the bottom choices dock (id stays
+    // btn-undo whether or not it is an ending section).
+    $("btn-undo").addEventListener("click", undo);
+    $("btn-ending-restart").addEventListener("click", startNewLine);
+    var routeBtn = $("btn-tree");
+    if (routeBtn) {
+      if (ROADMAP_URL) routeBtn.addEventListener("click", openRouteMap);
+      else routeBtn.hidden = true;
+    }
+    $("btn-jumpback-cancel").addEventListener("click", closeJumpBack);
+    $("jumpback-backdrop").addEventListener("click", function (ev) {
+      if (ev.target === this) closeJumpBack();
+    });
+    $("btn-home").addEventListener("click", goHome);
+
+    // top bar overflow ("More") menu toggle
+    $("btn-tbmore").addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var menu = $("tbmore-menu");
+      menu.hidden = !menu.hidden;
+    });
+    ROOT.addEventListener("click", function (ev) {
+      var menu = $("tbmore-menu");
+      if (menu && !menu.hidden && !menu.contains(ev.target) &&
+          ev.target !== $("btn-tbmore") &&
+          !$("btn-tbmore").contains(ev.target)) {
+        menu.hidden = true;
+      }
+    });
+
+    // global settings: reading font size
+    function setFontPx(n) {
+      n = Math.max(12, Math.min(32, parseInt(n, 10) || 16));
+      gSettings.fontPx = n;
+      applyFontSize();
+      saveGlobalSettings();
+    }
+    $("font-size-input").addEventListener("change", function () {
+      setFontPx(this.value);
+    });
+    $("btn-font-dec").addEventListener("click", function () {
+      setFontPx(gSettings.fontPx - 1);
+    });
+    var btnFontInc = $("btn-font-inc");
+    if (btnFontInc) btnFontInc.addEventListener("click", function () {
+      setFontPx(gSettings.fontPx + 1);
+    });
+    $("btn-font-reset").addEventListener("click", function () {
+      setFontPx(DEFAULT_SETTINGS.fontPx);
+    });
+    // persistent top-bar item checkboxes
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-tbcheck]"), function (cb) {
+        cb.addEventListener("change", function () {
+          gSettings.tb[cb.getAttribute("data-tbcheck")] = cb.checked;
+          applyTopbar();
+          if (!$("chapter-screen").hidden) renderChapter();
+          saveGlobalSettings();
+        });
+      });
+
+    $("btn-mode-summary").addEventListener("click", function () {
+      setMode("summary");
+    });
+    $("btn-mode-original").addEventListener("click", function () {
+      setMode("original");
+    });
+
+    $("btn-export").addEventListener("click", exportSave);
+    $("file-save").addEventListener("change", function () {
+      if (this.files[0]) importSave(this.files[0]);
+      this.value = "";
+    });
+    $("file-pack").addEventListener("change", function () {
+      if (this.files[0]) importPack(this.files[0]);
+      this.value = "";
+    });
+    $("btn-clear").addEventListener("click", function () {
+      if (!window.confirm(t("clearConfirm"))) return;
+      localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(PROGRESS_KEY);
+      state = freshState();   // nothing lit, nothing persisted: true 0.00%
+      var msg = $("settings-message");
+      msg.classList.remove("error");
+      msg.textContent = t("clearDone");
+      showTitle();
+    });
+    var btnUnload = $("btn-unload-pack");
+    if (btnUnload) btnUnload.addEventListener("click", unloadPack);
+    var btnResetAll = $("btn-reset-everything");
+    if (btnResetAll) btnResetAll.addEventListener("click", resetEverything);
+  }
+
+  // ---------------- localisation application ----------------
+  // Static template labels carry data-i18n / data-i18n-html /
+  // data-i18n-title / data-i18n-aria attributes; applyLocale rewrites them
+  // whenever the active pack changes the UI language.
+  function localizeStatic() {
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n]"), function (el) {
+        el.textContent = t(el.getAttribute("data-i18n"));
+      });
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n-html]"), function (el) {
+        el.innerHTML = t(el.getAttribute("data-i18n-html"));
+      });
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n-title]"), function (el) {
+        el.title = t(el.getAttribute("data-i18n-title"));
+      });
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-i18n-aria]"), function (el) {
+        el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria")));
+      });
+    // The restart button is hidden until an ending is reached, but keep its
+    // text localised so no English string survives in a Chinese DOM.
+    var restartBtn = $("btn-ending-restart");
+    if (restartBtn) {
+      restartBtn.textContent = t("restartFrom", { sec: pad3(START) });
+    }
+    document.documentElement.lang = uiLocale === "zh" ? "zh-CN" : "en";
+    try {
+      document.dispatchEvent(new CustomEvent("agb-localechange", {
+        detail: { locale: uiLocale }
+      }));
+    } catch (e) { /* older browsers: ignore */ }
+  }
+
+  function applyLocale() {
+    localizeStatic();
+    updateHomeLabels();
+    // The "More" overflow menu is built once; rebuild it in the new language.
+    var menu = $("tbmore-menu");
+    if (menu) { menu._built = false; menu.innerHTML = ""; }
+    applyTopbar();
+    if (!$("title-screen").hidden) showTitle();
+    if (!$("chapter-screen").hidden) renderChapter();
+  }
+
+  function updateHomeLabels() {
+    var homeLabel = $("btn-home-label");
+    var homeBtn = $("btn-home");
+    var homeMoreLabel = $("tbmore-home-label");
+    var homeText = HOOKS.onHome ? t("homeShelf") : t("homeTitle");
+    if (homeLabel) homeLabel.textContent = homeText;
+    if (homeMoreLabel) homeMoreLabel.textContent = homeText;
+    if (homeBtn) {
+      homeBtn.title = HOOKS.onHome ? t("homeShelfTip") : t("homeTitleTip");
+    }
+  }
+
+  // ---------------- boot ----------------
+  function renderBookIdentity() {
+    var name = META.title || DATA.book || t("gamebook");
+    $("title-name").textContent = name;
+    if (HOOKS.setTitle) { HOOKS.setTitle(META.full_title || name); }
+    else { document.title = META.full_title || name; }
+    var sub = META.subtitle || "";
+    $("title-sub").textContent = sub;
+    var kickerParts = [];
+    if (META.series) {
+      kickerParts.push(META.series +
+        (META.series_number ? " " + META.series_number : ""));
+    }
+    kickerParts.push(t("kicker"));
+    $("title-kicker").textContent = kickerParts.join(" \u00b7 ");
+    if (META.cover) $("title-cover").src = META.cover;
+    $("title-cover").hidden = !META.cover;
+
+    updateHomeLabels();
+
+    // In the multi-book entry, per-book actions (text pack import, save
+    // export/import/clear) live in the book card menu on the shelf, so the
+    // standalone-only Settings blocks are removed here.
+    if (HOOKS.providedPack) {
+      Array.prototype.forEach.call(
+        ROOT.querySelectorAll(".js-standalone-only"),
+        function (el) { el.remove(); });
+      var note = $("pack-status");
+      if (note && !packAvailable()) {
+        note.textContent = t("entryStatusNone");
+      }
+    }
+  }
+
+  function syncSettingsChecks() {
+    Array.prototype.forEach.call(
+      ROOT.querySelectorAll("[data-tbcheck]"), function (cb) {
+        var key = cb.getAttribute("data-tbcheck");
+        cb.checked = gSettings.tb[key] !== false;
+      });
+  }
+
+  // A route-map node links back with ?section=<n>. A section already in the
+  // save is restored as a jump (undo knows how to step back); an unvisited
+  // section is accepted only when it is a direct choice from the current
+  // section, so the map cannot write a false read path.
+  function openMapSection() {
+    var match = /(?:^|[?&])section=([0-9]+)/.exec(window.location.search || "");
+    if (!match) return;
+    var target = Number(match[1]);
+    var sec = SECTIONS[String(target)];
+    if (!sec) return;
+    if (target === state.cur) { showChapter(); return; }
+    var allowed = !!state.read[target];
+    if (!allowed) {
+      var cur = SECTIONS[String(state.cur)];
+      if (cur) {
+        for (var i = 0; i < cur.e.length; i++) {
+          if (cur.e[i][0] === target) { allowed = true; break; }
+        }
+      }
+    }
+    if (!allowed) return;
+    showChapter();
+    if (state.read[target]) {
+      state.stack.push(target);
+      state.cur = target;
+      state.jumps = state.jumps || [];
+      state.jumps.push(state.stack.length - 1);
+      persist();
+      renderChapter();
+      window.scrollTo(0, 0);
+    } else {
+      gotoSection(target);
+    }
+  }
+
+  function boot() {
+    var storedPack = loadStoredPack();
+    state = loadSave();
+    if (!state) {
+      state = freshState(); // title offers Start New; nothing persisted yet
+    } else {
+      writeProgress();      // carry an existing save into the map history
+    }
+    bind();
+    applyFontSize();
+    syncSettingsChecks();
+
+    function finish() {
+      localizeStatic();
+      applyTopbar();
+      renderBookIdentity();
+      refreshPackStatus();
+      showTitle();
+      openMapSection();
+    }
+
+    if (storedPack) {
+      var locale = storedPack.ui_locale === "zh" ? "zh" : "en";
+      ensureLocale(locale, function (ok) {
+        if (ok) applyPack(storedPack);
+        else uiLocale = "en";
+        finish();
+      });
+    } else {
+      finish();
+    }
+  }
+
+  if (opts.exposePackApi) {
+    window.AGBReader = { applyPack: applyPackFromHost };
+  }
+
+  // Mount boots the title screen and returns a small handle the host uses
+  // to tear the instance down (clears timers) when leaving the book.
+  boot();
+  return {
+    showChapter: showChapter,
+    unmount: function () { if (rollTimer) clearInterval(rollTimer); }
+  };
+  }
+
+  // ---------------- static helpers usable without a mounted reader -------
+  function makeController(opts) {
+    return startReader(opts);
+  }
+
+  // Shelf progress: compute weighted read percentage + has-save + endings
+  // found, directly from a save in localStorage (or an explicit save obj).
+  function progressInfo(DATA, saveObj) {
+    var sections = DATA.sections;
+    var totalWords = DATA.total_words || 0;
+    var total = DATA.count;
+    var readMap = {};
+    var endings = [];
+    var has = false;
+    var cur = null;
+    if (saveObj) {
+      has = true;
+      cur = saveObj.cur;
+      (saveObj.read || []).forEach(function (n) {
+        if (sections.hasOwnProperty(String(n))) readMap[n] = true;
+      });
+      endings = (saveObj.endings || []).filter(function (n) {
+        return sections.hasOwnProperty(String(n));
+      });
+    }
+    var words = 0;
+    Object.keys(readMap).forEach(function (k) {
+      var sec = sections[k];
+      if (sec && typeof sec.w === "number") words += sec.w;
+    });
+    var pct = totalWords > 0
+      ? words / totalWords * 100
+      : Object.keys(readMap).length / total * 100;
+    var endingTotal = 0;
+    Object.keys(sections).forEach(function (k) {
+      if (!sections[k].e.length) endingTotal++;
+    });
+    return {
+      hasSave: has, cur: cur, pct: pct,
+      readCount: Object.keys(readMap).length,
+      endingsFound: endings.length, endingTotal: endingTotal
+    };
+  }
+
+  function readSave(slug) {
+    try {
+      var raw = localStorage.getItem(slug + ".save.v1");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  window.ASReader = {
+    mount: function (rootEl, DATA, inlinePackSections, hooks) {
+      return makeController({
+        root: rootEl, DATA: DATA,
+        inlinePackSections: inlinePackSections || null,
+        hooks: hooks || null
+      });
+    },
+    progressInfo: progressInfo,
+    readSave: readSave
+  };
+
+  // Standalone package self-starts only when a book payload is embedded.
+  // The multi-book entry never defines window.BOOK_DATA, so this is inert
+  // there even though the same reader markup exists in its DOM.
+  if (window.BOOK_DATA) {
+    var inline = window.TEXT_PACK && window.TEXT_PACK.sections
+      ? window.TEXT_PACK.sections : null;
+    var runStandalone = function () {
+      makeController({
+        root: document, DATA: window.BOOK_DATA,
+        inlinePackSections: inline, hooks: null, exposePackApi: true
+      });
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", runStandalone);
+    } else {
+      runStandalone();
+    }
+  }
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Unlock full text</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #061626;
+  --surface: #0b2337;
+  --line: #2a5a86;
+  --text: #e6f1ff;
+  --dim: #9fb8cc;
+  --gold: #c9a24a;
+  --gold-bright: #e8c56a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% 0%, #123a5a 0%, var(--bg) 55%);
+  color: var(--text);
+  font: 16px/1.65 Georgia, "Times New Roman", serif;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 8vh 18px 40px;
+}
+main { width: 100%; max-width: 760px; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 26px 24px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .45);
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 1.35rem;
+  letter-spacing: .06em;
+  color: var(--gold-bright);
+  font-variant: small-caps;
+}
+.note { margin: 0 0 16px; color: var(--dim); font-size: .92rem; }
+label { display: block; margin-bottom: 6px; color: var(--dim); font-size: .84rem; }
+input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(0, 18, 36, .5);
+  color: var(--text);
+  font-size: 16px;
+}
+input:focus { outline: 2px solid var(--gold-bright); outline-offset: 2px; }
+#agb-vault-message {
+  min-height: 1.3em;
+  margin: 10px 0 4px;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+#agb-vault-message.is-error { color: #ff9d9d; }
+button {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(42, 90, 134, .4);
+  color: var(--text);
+  font: inherit;
+  min-height: 44px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--gold-bright); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.agb-vault-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.agb-vault-actions button { flex: 1 1 120px; min-width: 0; }
+#agb-vault-cancel { color: var(--dim); }
+#agb-vault-submit { color: var(--gold-bright); }
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: var(--dim);
+  font-size: .82rem;
+}
+.bar .grow { flex: 1 1 auto; }
+#agb-book-title { font-size: 1.15rem; }
+#agb-body p { margin: 0 0 1.05em; }
+#agb-body em { color: var(--gold-bright); font-style: normal; }
+#agb-body .prompt {
+  margin-top: 24px;
+  color: var(--gold-bright);
+  font-variant: small-caps;
+  letter-spacing: .12em;
+}
+#agb-choices { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+#agb-choices .choice { text-align: left; }
+#agb-choices .end {
+  color: var(--gold-bright);
+  font-variant: small-caps;
+  letter-spacing: .14em;
+  text-align: center;
+  padding: 18px 0;
+}
+@media (max-width: 560px) {
+  body { padding: 24px 12px 32px; }
+  .card { padding: 20px 16px; }
+}
+
+/* Shared four-stage unlock progress (reader page and generic vault page) */
+.agb-progress {
+  width: 100%;
+  min-width: 0;
+  margin: 12px 0 2px;
+}
+.agb-progress[hidden] { display: none !important; }
+.agb-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: .82rem;
+  color: var(--text-dim, var(--dim, #9fb8cc));
+}
+.agb-progress-label { min-width: 0; overflow-wrap: anywhere; }
+.agb-progress-pct {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold-bright, #e8c56a);
+}
+.agb-progress-bar {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 6px;
+}
+.agb-progress-seg {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 9px;
+  border: 1px solid var(--line, var(--tardis-line, #2a5a86));
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, .35);
+}
+.agb-progress-seg > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--gold, #c9a24a), var(--gold-bright, #e8c56a));
+  transition: width .16s linear;
+}
+.agb-progress-seg.is-active { border-color: var(--gold-bright, #e8c56a); }
+.agb-progress-seg.is-done > i { width: 100%; }
+.agb-progress-seg.is-indeterminate > i {
+  width: 45%;
+  animation: agb-progress-slide 1.1s linear infinite;
+}
+@keyframes agb-progress-slide {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(230%); }
+}
+.agb-progress-detail {
+  min-height: 1.1em;
+  margin-top: 5px;
+  font-size: .76rem;
+  color: var(--text-dim, var(--dim, #9fb8cc));
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .agb-progress-head { flex-wrap: wrap; row-gap: 2px; }
+  .agb-progress-label { flex: 1 1 auto; }
+}
+</style>
+</head>
+<body>
+<main id="agb-vault-page" data-vault-url="./5e7796872697bbbbba70d97d00798f76.bin">
+  <section id="agb-lock-view" class="card">
+    <h1>Unlock full text</h1>
+    <p class="note">This edition is stored encrypted. Enter the passphrase to
+      open it in this browser. It is never saved; refreshing or closing the
+      page locks it again.</p>
+    <form id="agb-vault-form">
+      <label for="agb-vault-passphrase">Passphrase</label>
+      <input id="agb-vault-passphrase" type="password" autocomplete="off"
+             autocapitalize="off" spellcheck="false" required>
+      <div id="agb-vault-message" role="status" aria-live="polite"></div>
+      
+      <div id="agb-vault-progress" class="agb-progress" hidden>
+        <div class="agb-progress-head">
+          <span class="agb-progress-label">Downloading encrypted text (1/4)</span>
+          <span class="agb-progress-pct">0%</span>
+        </div>
+        <div class="agb-progress-bar" role="progressbar" aria-valuemin="0"
+             aria-valuemax="100" aria-valuenow="0"
+             aria-label="Unlock progress">
+          <span class="agb-progress-seg" data-agb-stage="download"><i></i></span>
+          <span class="agb-progress-seg" data-agb-stage="derive"><i></i></span>
+          <span class="agb-progress-seg" data-agb-stage="decrypt"><i></i></span>
+          <span class="agb-progress-seg" data-agb-stage="render"><i></i></span>
+        </div>
+        <div class="agb-progress-detail" aria-live="polite"></div>
+      </div>
+      <div class="agb-vault-actions">
+        <button id="agb-vault-cancel" type="button" hidden>Cancel</button>
+        <button id="agb-vault-submit" type="submit">Unlock</button>
+      </div>
+    </form>
+  </section>
+  <section id="agb-book-view" class="card" hidden>
+    <div class="bar">
+      <button id="agb-back" type="button">Back</button>
+      <span class="grow">Section <span id="agb-section-no"></span></span>
+      <button id="agb-restart" type="button">Restart</button>
+    </div>
+    <h1 id="agb-book-title"></h1>
+    <div id="agb-body"></div>
+    <div id="agb-choices"></div>
+  </section>
+</main>
+<script src="../assets/vault.js?v=beb3712e" data-agb-worker="vault-worker.js?v=0cc6ebba"></script>
+</body>
+</html>
